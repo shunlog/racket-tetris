@@ -37,13 +37,14 @@
 ;
 ;(make-piece (make-posn x y) 'L 3)
 ;    Represents an L piece whose Shape's bottom-left corner is at coordinates (x, y)
-;    and that is rotated 270 degrees
-;
+;    and that is rotated 270 degrees.
+; A Piece is used to represent the active piece that the players controls
+(define-struct piece [posn shape-name rotation])
+
 ; A ShapeName is one of: '(L J S Z O T I)
-;
+
 ; A Rotation is one of '(0 1 2 3),
 ; representing 0, 90, 180 and 270 clock-wise rotation, respectively
-(define-struct piece [posn shape-name rotation])
 
 
 ;;;;;;;;;;;;
@@ -104,7 +105,7 @@
 
 ; ShapeName -> '((ShapeName rot-1) Shape-1
 ;                (ShapeName rot-2) Shape-2 ...) for every rot in Rotation
-(define (piece-rot shape-name)
+(define (h-piece-rot shape-name)
   (let* ([shape (hash-ref pieces shape-name)]
          [shape90 (rotate90 shape)]
          [shape180 (rotate90 shape90)]
@@ -117,10 +118,10 @@
 
 ; Hash: '(ShapeName Rotation) -> Shape
 ; This is the final data structure to hold the piece shapes for every rotation
-(define pieces-rot
+(define h-pieces-rot
   (make-immutable-hash
    (de-nest
-    (map (lambda (piece-name) (piece-rot piece-name))
+    (map (lambda (piece-name) (h-piece-rot piece-name))
          piece-names))))
 
 
@@ -130,24 +131,22 @@
 
 
 ; A Tetris is a structure:
-;   (make-tetris Block Playfield)
+;   (make-tetris Piece Playfield)
 ; A Playfield is a list of Blocks
 ;
 ; (make-tetris b0 (list b1 b2 ...)) means b0 is the
 ; dropping Block, while b1, b2, and ... are the resting Blocks
-(define-struct tetris [block playfield])
+(define-struct tetris [piece playfield])
 
 
 ;; Examples:
-(define playfield0 '())
-(define block-spawned (make-block (make-posn 5 (- HEIGHT 1))))
-(define tetris0 (make-tetris block-spawned playfield0))
+(define playfield0 `(,(make-block (make-posn 0 0))))
+(define piece0 (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0))
+(define tetris0 (make-tetris piece0 playfield0))
 
-(define block1 (make-block (make-posn 5 0)))
-(define tetris0-drop (make-tetris block1 playfield0))
 
-(define tetris1 (make-tetris (make-block (make-posn 5 1))
-                             (cons (make-block (make-posn 5 0)) '())))
+(define (spawn-piece)
+  (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0))
 
 
 ;; Block, Image -> Image
@@ -196,20 +195,20 @@
                 ,(make-block (make-posn 1 1))
                 ,(make-block (make-posn 2 1))
                 ,(make-block (make-posn 2 2))))
-(check-expect (piece-blocks (make-piece (make-posn 1 1) 'J 0))
-              `(,(make-block (make-posn 1 2))
-                ,(make-block (make-posn 2 2))
-                ,(make-block (make-posn 3 2))
-                ,(make-block (make-posn 1 3))))
+(check-expect (piece-blocks (make-piece (make-posn 1 5) 'J 0))
+              `(,(make-block (make-posn 1 6))
+                ,(make-block (make-posn 2 6))
+                ,(make-block (make-posn 3 6))
+                ,(make-block (make-posn 1 7))))
 (define (piece-blocks piece)
-  (let* ([sh (hash-ref pieces-rot
+  (let* ([sh (hash-ref h-pieces-rot
                           `(,(piece-shape-name piece)
                             ,(piece-rotation piece)))]
          [coords (shape-to-coords sh)])
     (map (lambda (coord)
            (make-block
             (make-posn (+ (first coord) (posn-x (piece-posn piece)))
-             (+ (second coord) (posn-x (piece-posn piece))))))
+             (+ (second coord) (posn-y (piece-posn piece))))))
          coords)))
 
 
@@ -229,8 +228,8 @@
 ;; Tetris -> Image
 ;; Draw a Tetris playfieled
 (define (draw-tetris tetris)
-  (draw-blocks (cons (tetris-block tetris)
-                     (tetris-playfield tetris))))
+  (draw-blocks (de-nest (list (piece-blocks (tetris-piece tetris))
+                              (tetris-playfield tetris)))))
 
 
 ; Block Playfield -> Boolean
@@ -271,35 +270,59 @@
       (block-overlapping-playfield? b plf)))
 
 
-; Direction, Block, Playfield -> Block
+; Piece, Playfield -> Boolean
+; Return true if any block in the piece is overlapping in the Playfield
+(check-expect (piece-overlapping? (make-piece (make-posn 5 5) 'L 0) '()) #f)
+(check-expect (piece-overlapping? (make-piece (make-posn 5 -2) 'L 0) '()) #t)
+(define (piece-overlapping? p plf)
+  (ormap (lambda (b)
+           (block-overlapping? b plf))
+         (piece-blocks p)))
+
+
+; Posn, Posn -> Posn
+; Add Posns
+(check-expect (posn+ (make-posn 1 2) (make-posn -1 1))
+              (make-posn 0 3))
+(define (posn+ p1 p2)
+  (make-posn (+ (posn-x p1) (posn-x p2))
+             (+ (posn-y p1) (posn-y p2))))
+
+
+; Piece, Direction -> Piece
 ; Direction is one of: 'right, 'left, 'down, 'rotate-cw
-; The returned value is the moved block
-; If the block can't be moved, the original block is returned
-(define (move-block dir block plf)
-  (let* ([new-block
-          (cond
-            [(eq? 'left dir)
-             (make-block (make-posn (sub1 (posn-x (block-posn block))) (posn-y (block-posn block))))]
-            [(eq? 'right dir)
-             (make-block (make-posn (add1 (posn-x (block-posn block))) (posn-y (block-posn block))))]
-            [(eq? 'down dir)
-             (make-block (make-posn (posn-x (block-posn block)) (sub1 (posn-y (block-posn block)))))]
-            [else block])]
-         [overlapping (block-overlapping? new-block plf)])
-    (if overlapping block new-block)))
+(define (move-piece piece dirn)
+  (let* ([pposn (piece-posn piece)]
+         [move-by-posn (lambda (psn)
+                         (make-piece (posn+ pposn psn)
+                                     (piece-shape-name piece)
+                                     (piece-rotation piece)))])
+    (cond
+      [(eq? 'left dirn) (move-by-posn (make-posn -1 0))]
+      [(eq? 'right dirn) (move-by-posn (make-posn 1 0))]
+      [(eq? 'down dirn) (move-by-posn (make-posn 0 -1))]
+      [else piece])))
+
+
+; Direction, Piece, Playfield -> Piece
+; The returned value is the moved piece if it could be moved,
+; otherwise it's the original piece
+(define (move-piece-maybe dirn piece plf)
+  (let* ([pposn (piece-posn piece)]
+         [new-piece (move-piece piece dirn)]
+         [overlapping (piece-overlapping? new-piece plf)])
+    (if overlapping piece new-piece)))
 
 
 ; Block Playfield -> Block
 ; Return the block after it was moved down as much as possible
-(check-expect (soft-drop (make-block (make-posn 5 (sub1 HEIGHT))) '())
-              (make-block (make-posn 5 0)))
-(check-expect (soft-drop (make-block (make-posn 5 (sub1 HEIGHT))) (list (make-block (make-posn 5 0))))
-              (make-block (make-posn 5 1)))
-(define (soft-drop block plf)
-  (let* ([new-block (move-block 'down block plf)]
-         [same (equal? block new-block)])
-    (if same block
-        (soft-drop new-block plf))))
+(check-expect (soft-drop (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0) '())
+              (make-piece (make-posn 5 -1) 'L 0))
+(define (soft-drop piece plf)
+  (let* ([new-piece (move-piece-maybe 'down piece plf)]
+         [same (equal? piece new-piece)])
+    (if same piece
+        (soft-drop new-piece plf))))
 
 
 ; Playfield -> List of Integers
@@ -331,10 +354,10 @@
 (define plf-cleared1 `(,(make-block (make-posn 5 0))
                        ,(make-block (make-posn 4 1))))
 ; see this diagram for a visual explanation
-(define clear-lines-explanation
-  (beside (draw-tetris (make-tetris block-spawned plf-full1))
-         (text " Clear lines -> " 25 'black)
-         (draw-tetris (make-tetris block-spawned plf-cleared1))))
+;; (define clear-lines-explanation
+;;   (beside (draw-tetris (make-tetris block-spawned plf-full1))
+;;          (text " Clear lines -> " 25 'black)
+;;          (draw-tetris (make-tetris block-spawned plf-cleared1))))
 (check-expect (clear-lines plf-full1) plf-cleared1)
 (define (clear-lines plf)
   (let* ([complete-lines-list (complete-lines plf)]
@@ -352,22 +375,22 @@
 
 
 ; Tetris -> Tetris
-; Drop block due to gravity,
-; or if it landed, lock it, clear the lines, and spawn a new block
-(define (drop-block-or-lock tetris)
-  (let* ([block (tetris-block tetris)]
+; Drop active Piece due to gravity,
+; or if it landed, lock it, clear the lines, and spawn a new Piece
+(define (drop-piece-or-lock tetris)
+  (let* ([piece (tetris-piece tetris)]
          [plf (tetris-playfield tetris)]
-         [new-block (move-block 'down block plf)]
-         [landed (equal? (block-posn block) (block-posn new-block))])
+         [new-piece (move-piece-maybe 'down piece plf)]
+         [landed (equal? (piece-posn piece) (piece-posn new-piece))])
     (if landed
-        (make-tetris (make-block (make-posn 5 (sub1 HEIGHT))) (cons block plf))
-        (make-tetris new-block (tetris-playfield tetris)))))
+        (make-tetris (spawn-piece) (de-nest (list (piece-blocks piece) plf)))
+        (make-tetris new-piece (tetris-playfield tetris)))))
 
 
 ; Tetris -> Tetris
 (define (tetris-on-tick tetris)
-  (let* ([t1 (drop-block-or-lock tetris)]
-         [b1 (tetris-block t1)]
+  (let* ([t1 (drop-piece-or-lock tetris)]
+         [b1 (tetris-piece t1)]
          [plf1 (tetris-playfield t1)]
          [plf-cleared (clear-lines plf1)])
     (make-tetris b1 plf-cleared)))
@@ -375,15 +398,15 @@
 
 ; Tetris, Key -> Tetris
 (define (tetris-on-key w k)
-  (let* ([b (tetris-block w)]
+  (let* ([piece (tetris-piece w)]
          [plf (tetris-playfield w)])
     (cond
      [(key=? k " ")
-      (make-tetris (soft-drop b plf) plf)]
+      (make-tetris (soft-drop piece plf) plf)]
      [(key=? k "left")
-      (make-tetris (move-block 'left b plf) plf)]
+      (make-tetris (move-piece-maybe 'left piece plf) plf)]
      [(key=? k "right")
-      (make-tetris (move-block 'right b plf) plf)]
+      (make-tetris (move-piece-maybe 'right piece plf) plf)]
      [else w])))
 
 
