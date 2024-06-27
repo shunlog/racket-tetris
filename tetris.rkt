@@ -3,6 +3,42 @@
 (require 2htdp/universe)
 (require 2htdp/image)
 
+;;;;;;;;;;;
+;; Utils ;;
+;;;;;;;;;;;
+
+
+; List -> Any
+; Return a random item from the list
+(define (pick-item l)
+  (list-ref l (random (length l))))
+
+
+; List of Lists -> List
+; Flatten one level of nesting
+(define (de-nest lss)
+  (foldr
+   (lambda (ls xs)
+     (foldr cons xs ls))
+   '() lss))
+
+
+; List of Lists -> List of Lists
+; Transpose a matrix
+(define (transpose ll)
+  (apply map list ll))
+
+
+; List of Lists -> List of Lists
+; Rotate matrix 90 degrees
+(define (rotate90 ll)
+  (map reverse (transpose ll)))
+
+
+;;;;;;;;;;;;
+;; Blocks ;;
+;;;;;;;;;;;;
+
 ; As a convention, the coordinates space will be the same as in math:
 ; x increases to the right
 ; y increases to the top
@@ -42,6 +78,7 @@
 (define-struct piece [posn shape-name rotation])
 
 ; A ShapeName is one of: '(L J S Z O T I)
+(define shape-names '(L J Z S T O I))
 
 ; A Rotation is one of '(0 1 2 3),
 ; representing 0, 90, 180 and 270 clock-wise rotation, respectively
@@ -58,25 +95,6 @@
 ; We pre-compute all the shapes rotations for a slight optimization,
 ; and maybe as an exercise
 
-
-; List of Lists -> List
-; Flatten one level of nesting
-(define (de-nest lss)
-  (foldr
-   (lambda (ls xs)
-     (foldr cons xs ls))
-   '() lss))
-
-; Transpose a matrix (List of Lists
-(define (transpose ll)
-  (apply map list ll))
-
-; Rotate matrix 90 degrees
-(define (rotate90 ll)
-  (map reverse (transpose ll)))
-
-
-(define piece-names '(L J Z S T O I))
 
 ; Hash: ShapeName -> Shape
 (define pieces
@@ -122,7 +140,7 @@
   (make-immutable-hash
    (de-nest
     (map (lambda (piece-name) (h-piece-rot piece-name))
-         piece-names))))
+         shape-names))))
 
 
 ;;;;;;;;;;;;
