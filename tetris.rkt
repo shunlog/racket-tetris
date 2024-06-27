@@ -92,11 +92,10 @@
 
 ; Piece, Integer -> Piece
 ; Positive rot for clockwise, negative for counter-clockwise
-(define (piece-rotate piece rot)
-  (make-piece (piece-posn piece)
-              (piece-shape-name piece)
-              (modulo (+ rot (piece-rotation piece))
-                      4)))
+(define (piece-rotate p rot)
+  (struct-copy piece p [rotation
+                        (modulo (+ rot (piece-rotation p))
+                                4)]))
 (check-equal? (piece-rotate (make-piece (make-posn 1 2) 'L 0) -1)
               (make-piece (make-posn 1 2) 'L 3))
 
@@ -327,20 +326,19 @@
 
 ; Piece, Direction -> Piece
 ; Direction is one of: 'right, 'left, 'down, 'rotate-cw
-(define (move-piece piece dirn)
-  (let* ([pposn (piece-posn piece)]
-         [move-by-posn (lambda (psn)
-                         (make-piece (posn+ pposn psn)
-                                     (piece-shape-name piece)
-                                     (piece-rotation piece)))])
+(define (move-piece p dirn)
+  (let* ([posn1 (piece-posn p)]
+         [add-posn  ; Returns piece with a posn added to its posn
+          (lambda (posn2)
+            (struct-copy piece p [posn (posn+ posn1 posn2)]))])
     (cond
-      [(eq? 'left dirn) (move-by-posn (make-posn -1 0))]
-      [(eq? 'right dirn) (move-by-posn (make-posn 1 0))]
-      [(eq? 'down dirn) (move-by-posn (make-posn 0 -1))]
-      [(eq? 'rotate-cw dirn) (piece-rotate piece 1)]
-      [(eq? 'rotate-ccw dirn) (piece-rotate piece -1)]
-      [(eq? 'rotate-180 dirn) (piece-rotate piece 2)]
-      [else piece])))
+      [(eq? 'left dirn) (add-posn (make-posn -1 0))]
+      [(eq? 'right dirn) (add-posn (make-posn 1 0))]
+      [(eq? 'down dirn) (add-posn (make-posn 0 -1))]
+      [(eq? 'rotate-cw dirn) (piece-rotate p 1)]
+      [(eq? 'rotate-ccw dirn) (piece-rotate p -1)]
+      [(eq? 'rotate-180 dirn) (piece-rotate p 2)]
+      [else p])))
 
 
 ; Direction, Piece, Playfield -> Piece
