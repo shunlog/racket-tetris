@@ -13,7 +13,14 @@
 ;;;;;;;;;;;
 
 ; String List-of-Strings -> Bool
-(define (member? str strs) (ormap [lambda (s) (equal? s str)] strs))
+(define (member? str strs)
+  (ormap [lambda (s) (equal? s str)] strs))
+
+; Function(Any -> Boolean) List -> Bool
+; Returns true if any member of the list satisfies given function
+; when passed as an argument to it
+(define (any-satisfies? fun l)
+  (ormap [lambda (elem) (fun elem)] l))
 
 ; List -> Any
 ; Return a random item from the list
@@ -53,9 +60,9 @@
 
 ; image of a Block
 (define BLOCK-SIZE 20) ; blocks are squares
-(define BLOCK
+(define (block-img color)
   (overlay
-   (square (- BLOCK-SIZE 1) "solid" "gray")
+   (square (- BLOCK-SIZE 1) "solid" color)
    (square BLOCK-SIZE "outline" "black")))
 
 ;; Grid size
@@ -72,7 +79,7 @@
 ;
 ; (make-block (make-posn x y)) depicts a block at position (x, y) in the grid,
 ; where (0, 0) marks the bottom-left position in the playfield
-(define-struct block [posn] #:transparent)
+(define-struct block [posn color] #:transparent)
 
 
 ; A Piece is a structure:
@@ -107,9 +114,17 @@
 ; A Piece occupies those blocks for which the Shape has a value of True
 ; The Shape's bottom-left corner coincides with the Piece's position
 
+(define h-shape-color
+  (make-immutable-hash '((L . orange)
+                         (J . blue)
+                         (Z . red)
+                         (S . green)
+                         (T . purple)
+                         (O . yellow)
+                         (I . lightblue))))
+
 ; We pre-compute all the shapes rotations for a slight optimization,
 ; and maybe as an exercise
-
 
 ; Hash: ShapeName -> Shape
 (define pieces
@@ -173,10 +188,10 @@
 
 
 ;; Examples:
-(define playfield0 `(,(make-block (make-posn 0 0))))
+(define playfield0 `())
 (define piece0 (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0))
 (define tetris0 (make-tetris piece0 playfield0))
-
+(define playfield1 `(,(make-block (make-posn 0 0) 'gray)))
 
 (define (spawn-piece)
   (make-piece (make-posn 5 (- HEIGHT 3))
@@ -191,7 +206,7 @@
                (* (posn-x (block-posn b)) BLOCK-SIZE)
                (- PLAYFIELD-HEIGHT
                   (* (+ (posn-y (block-posn b)) 1) BLOCK-SIZE))
-               BLOCK))
+               (block-img (block-color b))))
 
 
 ; Number, Number -> List of Pairs
@@ -226,25 +241,28 @@
 ; Piece -> List of Blocks
 ; Returns a list of blocks that the piece consists of
 (define (piece-blocks piece)
-  (let* ([sh (hash-ref h-pieces-rot
-                          `(,(piece-shape-name piece)
+  (let* ([sh-name (piece-shape-name piece)]
+         [sh (hash-ref h-pieces-rot
+                          `(,sh-name
                             ,(piece-rotation piece)))]
-         [coords (shape-to-coords sh)])
+         [coords (shape-to-coords sh)]
+         [sh-color (hash-ref h-shape-color sh-name)])
     (map (lambda (coord)
            (make-block
             (make-posn (+ (first coord) (posn-x (piece-posn piece)))
-             (+ (second coord) (posn-y (piece-posn piece))))))
+                       (+ (second coord) (posn-y (piece-posn piece))))
+            sh-color))
          coords)))
-(check-equal? (piece-blocks (make-piece (make-posn 0 0) 'L 0))
-              `(,(make-block (make-posn 0 1))
-                ,(make-block (make-posn 1 1))
-                ,(make-block (make-posn 2 1))
-                ,(make-block (make-posn 2 2))))
-(check-equal? (piece-blocks (make-piece (make-posn 1 5) 'J 0))
-              `(,(make-block (make-posn 1 6))
-                ,(make-block (make-posn 2 6))
-                ,(make-block (make-posn 3 6))
-                ,(make-block (make-posn 1 7))))
+(check-equal? (map block-posn (piece-blocks (make-piece (make-posn 0 0) 'L 0)))
+              (map block-posn `(,(make-block (make-posn 0 1) 'gray)
+                                ,(make-block (make-posn 1 1) 'gray)
+                                ,(make-block (make-posn 2 1) 'gray)
+                                ,(make-block (make-posn 2 2) 'gray))))
+(check-equal? (map block-posn (piece-blocks (make-piece (make-posn 1 5) 'J 0)))
+              (map block-posn `(,(make-block (make-posn 1 6) 'gray)
+                                ,(make-block (make-posn 2 6) 'gray)
+                                ,(make-block (make-posn 3 6) 'gray)
+                                ,(make-block (make-posn 1 7) 'gray))))
 
 
 ; List of Blocks -> Image
@@ -276,10 +294,10 @@
     [else (or (equal? (block-posn b) (block-posn (first plf)))
               (block-overlapping-playfield? b (rest plf)))]))
 (check-equal?
- (block-overlapping-playfield? (make-block (make-posn 0 1)) (list (make-block (make-posn 0 0))))
+ (block-overlapping-playfield? (make-block (make-posn 0 1) 'gray) (list (make-block (make-posn 0 0) 'gray)))
  #f)
 (check-equal?
- (block-overlapping-playfield? (make-block (make-posn 0 0)) (list (make-block (make-posn 0 0))))
+ (block-overlapping-playfield? (make-block (make-posn 0 0) 'gray) (list (make-block (make-posn 0 0) 'gray)))
  #t)
 
 
@@ -290,11 +308,11 @@
       (>= (posn-x (block-posn b)) WIDTH)
       (< (posn-y (block-posn b)) 0)
       (>= (posn-y (block-posn b)) HEIGHT)))
-(check-equal? (block-outside-playfield? (make-block (make-posn -1 0))) #t)
-(check-equal? (block-outside-playfield? (make-block (make-posn WIDTH 0))) #t)
-(check-equal? (block-outside-playfield? (make-block (make-posn 0 HEIGHT))) #t)
-(check-equal? (block-outside-playfield? (make-block (make-posn 0 -1))) #t)
-(check-equal? (block-outside-playfield? (make-block (make-posn 0 0))) #f)
+(check-equal? (block-outside-playfield? (make-block (make-posn -1 0) 'gray)) #t)
+(check-equal? (block-outside-playfield? (make-block (make-posn WIDTH 0) 'gray)) #t)
+(check-equal? (block-outside-playfield? (make-block (make-posn 0 HEIGHT) 'gray)) #t)
+(check-equal? (block-outside-playfield? (make-block (make-posn 0 -1) 'gray)) #t)
+(check-equal? (block-outside-playfield? (make-block (make-posn 0 0) 'gray)) #f)
 
 
 ; Block Playfield -> Boolean
@@ -362,17 +380,19 @@
               (make-piece (make-posn 5 -1) 'L 0))
 
 
-(define plf-full1 `(,@(build-list 10 (lambda (x) (make-block (make-posn x 0))))
-                 ,(make-block (make-posn 5 1))
-                 ,@(build-list 10 (lambda (x) (make-block (make-posn x 2))))
-                 ,(make-block (make-posn 4 3))))
+(define plf-full1 `(,@(build-list 10 (lambda (x) (make-block (make-posn x 0) 'gray)))
+                 ,(make-block (make-posn 5 1) 'gray)
+                 ,@(build-list 10 (lambda (x) (make-block (make-posn x 2) 'gray)))
+                 ,(make-block (make-posn 4 3) 'blue)))
 
 ; Playfield -> List of Integers
 ; Returns a list of row indeces that represent completed lines
 (define (complete-lines plf)
   (let* ([line-complete? ;;  Returns true if line with index y is complete
           (lambda (y)
-            (andmap (lambda (x) (member? (make-block (make-posn x y)) plf))
+            (andmap (lambda (x) (any-satisfies?
+                                 (lambda (b) (equal? (block-posn b) (make-posn x y)))
+                                 plf))
                     (build-list WIDTH identity)))])
     (filter line-complete? (build-list HEIGHT identity))))
 (check-equal? (complete-lines plf-full1)
@@ -389,27 +409,32 @@
 ; Playfield -> Playfield
 ; Clear the completed tetris lines.
 ; the lines above the completed ones get shifted down.
-(define plf-cleared1 `(,(make-block (make-posn 5 0))
-                       ,(make-block (make-posn 4 1))))
-; see this diagram for a visual explanation
-;; (define clear-lines-explanation
-;;   (beside (draw-tetris (make-tetris block-spawned plf-full1))
-;;          (text " Clear lines -> " 25 'black)
-;;          (draw-tetris (make-tetris block-spawned plf-cleared1))))
 (define (clear-lines plf)
   (let* ([complete-lines-list (complete-lines plf)]
          ;; List of blocks that remain after clearing the complete lines
          [remaining-blocks (filter
                             (lambda (b) (not (member? (posn-y (block-posn b)) complete-lines-list)))
                             plf)]
+         [new-y-fun (lambda (b)
+                      (- (posn-y (block-posn b))
+                         (count-less
+                          (posn-y (block-posn b))
+                          complete-lines-list)))]
          ;; Move the block down as many lines as there are completed lines below
          [move-down-fun
-          (lambda (b)
-            (make-block (make-posn (posn-x (block-posn b))
-                         (- (posn-y (block-posn b))
-                            (count-less (posn-y (block-posn b)) complete-lines-list)))))])
+          (lambda (b) (struct-copy block b
+                                   [posn (make-posn (posn-x (block-posn b))
+                                                    (new-y-fun b))]))])
     (map move-down-fun remaining-blocks)))
+; Test:
+(define plf-cleared1 `(,(make-block (make-posn 5 0) 'gray)
+                       ,(make-block (make-posn 4 1) 'blue)))
 (check-equal? (clear-lines plf-full1) plf-cleared1)
+; See this diagram for a visual explanation
+(define clear-lines-explanation
+  (beside (draw-blocks plf-full1)
+          (text " Clear lines -> " 25 'black)
+          (draw-blocks plf-cleared1)))
 
 
 ; Tetris -> Tetris
@@ -454,8 +479,10 @@
      [else w])))
 
 
+(define (tetris-start) (make-tetris (spawn-piece) '()))
+
 (define (main tick-durn)
-  (big-bang tetris0
+  (big-bang (tetris-start)
             [on-tick tetris-on-tick tick-durn]
             [to-draw draw-tetris]
             [on-key tetris-on-key]))
