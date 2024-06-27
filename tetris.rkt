@@ -10,7 +10,7 @@
 
 ; List -> Any
 ; Return a random item from the list
-(define (pick-item l)
+(define (random-choice l)
   (list-ref l (random (length l))))
 
 
@@ -164,7 +164,9 @@
 
 
 (define (spawn-piece)
-  (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0))
+  (make-piece (make-posn 5 (- HEIGHT 3))
+              (random-choice shape-names)
+              0))
 
 
 ;; Block, Image -> Image
