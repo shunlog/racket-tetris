@@ -83,6 +83,15 @@
 ; A Rotation is one of '(0 1 2 3),
 ; representing 0, 90, 180 and 270 clock-wise rotation, respectively
 
+; Piece, Integer -> Piece
+; Positive rot for clockwise, negative for counter-clockwise
+(check-expect (piece-rotate (make-piece (make-posn 1 2) 'L 0) -1)
+              (make-piece (make-posn 1 2) 'L 3))
+(define (piece-rotate piece rot)
+  (make-piece (piece-posn piece)
+              (piece-shape-name piece)
+              (modulo (+ rot (piece-rotation piece))
+                      4)))
 
 ;;;;;;;;;;;;
 ;; Shapes ;;
@@ -321,6 +330,9 @@
       [(eq? 'left dirn) (move-by-posn (make-posn -1 0))]
       [(eq? 'right dirn) (move-by-posn (make-posn 1 0))]
       [(eq? 'down dirn) (move-by-posn (make-posn 0 -1))]
+      [(eq? 'rotate-cw dirn) (piece-rotate piece 1)]
+      [(eq? 'rotate-ccw dirn) (piece-rotate piece -1)]
+      [(eq? 'rotate-180 dirn) (piece-rotate piece 2)]
       [else piece])))
 
 
@@ -427,11 +439,17 @@
       (make-tetris (move-piece-maybe 'left piece plf) plf)]
      [(key=? k "right")
       (make-tetris (move-piece-maybe 'right piece plf) plf)]
+     [(or (key=? k "up") (key=? k "x"))
+      (make-tetris (move-piece-maybe 'rotate-cw piece plf) plf)]
+     [(key=? k "z")
+      (make-tetris (move-piece-maybe 'rotate-ccw piece plf) plf)]
+     [(key=? k "a")
+      (make-tetris (move-piece-maybe 'rotate-180 piece plf) plf)]
      [else w])))
 
 
-(define (main x)
+(define (main tick-durn)
   (big-bang tetris0
-            [on-tick tetris-on-tick 0.1]
+            [on-tick tetris-on-tick tick-durn]
             [to-draw draw-tetris]
             [on-key tetris-on-key]))
