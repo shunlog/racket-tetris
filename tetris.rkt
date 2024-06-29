@@ -62,8 +62,10 @@
 (define BLOCK-SIZE 20) ; blocks are squares
 (define (block-img color)
   (overlay
-   (square (- BLOCK-SIZE 1) "solid" color)
-   (square BLOCK-SIZE "outline" "black")))
+   (pulled-regular-polygon BLOCK-SIZE 4 1/8 30 "solid" color)
+   (overlay
+    (square (- BLOCK-SIZE 1) "solid" "black")
+    (square BLOCK-SIZE "outline" "black"))))
 
 ;; Grid size
 (define WIDTH 10)
@@ -138,12 +140,12 @@
 
 (define h-shape-color
   (make-immutable-hash '((L . orange)
-                         (J . blue)
+                         (J . "Royal Blue")
                          (Z . red)
                          (S . green)
-                         (T . purple)
+                         (T . "Light Purple")
                          (O . yellow)
-                         (I . lightblue))))
+                         (I . "Medium Cyan"))))
 
 ; We pre-compute all the shapes rotations for a slight optimization,
 ; and maybe as an exercise
