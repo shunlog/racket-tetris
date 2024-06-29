@@ -101,18 +101,18 @@
 
 
 ; Rotation, Or[RotateDirection / Rotation] -> Rotation
-(define (add-rotation rot0 dirn)
+(define (rotation+ rot0 dirn)
   (let* ([rot-count
           (cond [(eq? 'cw dirn) 1]
                 [(eq? 'ccw dirn) -1]
                 [(integer? dirn) dirn]
                 [else (error "Invalid rotation argument")])])
     (modulo (+ rot0 rot-count) 4)))
-(check-equal? (add-rotation 0 1) 1)
-(check-equal? (add-rotation 3 1) 0)
-(check-equal? (add-rotation 0 -1) 3)
-(check-equal? (add-rotation 0 'cw) 1)
-(check-equal? (add-rotation 0 'ccw) 3)
+(check-equal? (rotation+ 0 1) 1)
+(check-equal? (rotation+ 3 1) 0)
+(check-equal? (rotation+ 0 -1) 3)
+(check-equal? (rotation+ 0 'cw) 1)
+(check-equal? (rotation+ 0 'ccw) 3)
 
 
 ; Piece, Or[Integer / RotateDirection] -> Piece
@@ -125,7 +125,7 @@
                 [(integer? rot) rot]
                 [else (error "Invalid rotation argument")])]
          [rot0 (piece-rotation p)]
-         [new-rot (add-rotation rot0 rot)])
+         [new-rot (rotation+ rot0 rot)])
     (struct-copy piece p [rotation new-rot])))
 (check-equal? (piece-rotate (make-piece (make-posn 1 2) 'L 0) -1)
               (make-piece (make-posn 1 2) 'L 3))
@@ -446,7 +446,7 @@
 (define (try-rotate-piece dirn piece0 plf)
   (let* ([shape-name (piece-shape-name piece0)]
          [rot0 (piece-rotation piece0)]
-         [new-rot (add-rotation rot0 dirn)]
+         [new-rot (rotation+ rot0 dirn)]
          [kick-table (hash-ref h-shape-name-to-kick-data shape-name)]
          [kick-list (hash-ref kick-table `(,rot0 . ,new-rot))]
          [try-kick  ; return #t if this kick doesn't fail, else #f
