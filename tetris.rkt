@@ -12,7 +12,7 @@
 ;; Utils ;;
 ;;;;;;;;;;;
 
-; String List-of-Strings -> Bool
+; Any List -> Bool
 (define (member? str strs)
   (ormap [lambda (s) (equal? s str)] strs))
 
@@ -97,12 +97,34 @@
 ; A Rotation is one of '(0 1 2 3),
 ; representing 0, 90, 180 and 270 clock-wise rotation, respectively
 
-; Piece, Integer -> Piece
+
+; Rotation, Or[RotateDirection / Rotation] -> Rotation
+(define (add-rotation rot0 dirn)
+  (let* ([rot-count
+          (cond [(eq? 'cw dirn) 1]
+                [(eq? 'ccw dirn) -1]
+                [(integer? dirn) dirn]
+                [else (error "Invalid rotation argument")])])
+    (modulo (+ rot0 rot-count) 4)))
+(check-equal? (add-rotation 0 1) 1)
+(check-equal? (add-rotation 3 1) 0)
+(check-equal? (add-rotation 0 -1) 3)
+(check-equal? (add-rotation 0 'cw) 1)
+(check-equal? (add-rotation 0 'ccw) 3)
+
+
+; Piece, Or[Integer / RotateDirection] -> Piece
 ; Positive rot for clockwise, negative for counter-clockwise
 (define (piece-rotate p rot)
-  (struct-copy piece p [rotation
-                        (modulo (+ rot (piece-rotation p))
-                                4)]))
+  (let* ([rot-count
+          (cond [(eq? 'cw rot) 1]
+                [(eq? 'ccw rot) -1]
+                [(eq? 180 rot) 2]
+                [(integer? rot) rot]
+                [else (error "Invalid rotation argument")])]
+         [rot0 (piece-rotation p)]
+         [new-rot (add-rotation rot0 rot)])
+    (struct-copy piece p [rotation new-rot])))
 (check-equal? (piece-rotate (make-piece (make-posn 1 2) 'L 0) -1)
               (make-piece (make-posn 1 2) 'L 3))
 
@@ -342,37 +364,128 @@
               (make-posn 0 3))
 
 
-; Piece, Direction -> Piece
-; Direction is one of: 'right, 'left, 'down, 'rotate-cw
-(define (move-piece p dirn)
-  (let* ([posn1 (piece-posn p)]
-         [add-posn  ; Returns piece with a posn added to its posn
-          (lambda (posn2)
-            (struct-copy piece p [posn (posn+ posn1 posn2)]))])
-    (cond
-      [(eq? 'left dirn) (add-posn (make-posn -1 0))]
-      [(eq? 'right dirn) (add-posn (make-posn 1 0))]
-      [(eq? 'down dirn) (add-posn (make-posn 0 -1))]
-      [(eq? 'rotate-cw dirn) (piece-rotate p 1)]
-      [(eq? 'rotate-ccw dirn) (piece-rotate p -1)]
-      [(eq? 'rotate-180 dirn) (piece-rotate p 2)]
-      [else p])))
+; Piece, Any[Direction / Posn / Pair of int] -> Piece
+; Direction is one of: 'right, 'left, 'down, 'up
+; Move the piece using either a symbol, a pair or a Posn
+(define (piece-move p dirn)
+  (let* ([delta-posn
+          (cond [(posn? dirn) dirn]
+                [(eq? 'right dirn) (make-posn 1 0)]
+                [(eq? 'left dirn) (make-posn -1 0)]
+                [(eq? 'down dirn) (make-posn 0 -1)]
+                [(eq? 'up dirn) (make-posn 0 1)]
+                [(and (list? dirn)
+                      (= (length dirn) 2)
+                      (integer? (first dirn))
+                      (integer? (second dirn)))
+                 (make-posn (first dirn) (second dirn))])])
+    (struct-copy piece p [posn (posn+ (piece-posn p)
+                                      delta-posn)])))
 
 
 ; Direction, Piece, Playfield -> Piece
-; The returned value is the moved piece if it could be moved,
-; otherwise it's the original piece
-(define (move-piece-maybe dirn piece plf)
+; Try to move the piece in the specified Direction
+; Return the moved piece if it could be moved,
+; otherwise return the original piece
+(define (try-move-piece dirn piece plf)
   (let* ([pposn (piece-posn piece)]
-         [new-piece (move-piece piece dirn)]
+         [new-piece (piece-move piece dirn)]
          [overlapping (piece-overlapping? new-piece plf)])
     (if overlapping piece new-piece)))
+
+
+; A KickDataTable is a Hash:
+; (Rotation . Rotation) -> List of (Pair of Integer)
+; Interpretation:
+;     map the (initial rotation, final rotation) pair
+;     to the list of "kicks" to try when rotating a shape.
+; For details, see: https://tetris.wiki/Super_Rotation_System
+
+
+; J, L, S, T, Z Tetromino KickDataTable
+(define h-kick-data-1
+  (make-immutable-hash
+   '(((0 . 1) . (( 0  0) (-1  0) (-1 +1) ( 0 -2) (-1 -2)))
+     ((1 . 0) . (( 0  0) (+1  0) (+1 -1) ( 0 +2) (+1 +2)))
+     ((1 . 2) . (( 0  0) (+1  0) (+1 -1) ( 0 +2) (+1 +2)))
+     ((2 . 1) . (( 0  0) (-1  0) (-1 +1) ( 0 -2) (-1 -2)))
+     ((2 . 3) . (( 0  0) (+1  0) (+1 +1) ( 0 -2) (+1 -2)))
+     ((3 . 2) . (( 0  0) (-1  0) (-1 -1) ( 0 +2) (-1 +2)))
+     ((3 . 0) . (( 0  0) (-1  0) (-1 -1) ( 0 +2) (-1 +2)))
+     ((0 . 3) . (( 0  0) (+1  0) (+1 +1) ( 0 -2) (+1 -2))))))
+
+; I Tetromino KickDataTable
+(define h-kick-data-2
+  (make-immutable-hash
+   '(((0 . 1) . (( 0  0) (-2  0) (+1  0) (-2 -1) (+1 +2)))
+     ((1 . 0) . (( 0  0) (+2  0) (-1  0) (+2 +1) (-1 -2)))
+     ((1 . 2) . (( 0  0) (-1  0) (+2  0) (-1 +2) (+2 -1)))
+     ((2 . 1) . (( 0  0) (+1  0) (-2  0) (+1 -2) (-2 +1)))
+     ((2 . 3) . (( 0  0) (+2  0) (-1  0) (+2 +1) (-1 -2)))
+     ((3 . 2) . (( 0  0) (-2  0) (+1  0) (-2 -1) (+1 +2)))
+     ((3 . 0) . (( 0  0) (+1  0) (-2  0) (+1 -2) (-2 +1)))
+     ((0 . 3) . (( 0  0) (-1  0) (+2  0) (-1 +2) (+2 -1))))))
+
+; ShapeName -> KickDataTable
+(define h-shape-name-to-kick-data
+  (make-immutable-hash  `([I . ,h-kick-data-2]
+                          [L . ,h-kick-data-1]
+                          [J . ,h-kick-data-1]
+                          [S . ,h-kick-data-1]
+                          [Z . ,h-kick-data-1]
+                          [O . ,h-kick-data-1]
+                          [T . ,h-kick-data-1])))
+
+
+; RotateDirection, Piece, Playfield -> Piece
+; RotateDirection is one of ['cw 'ccw]
+; Try to rotate the piece according to the Super Rotation System,
+; return it if succeeded, otherwise return the original
+(define (try-rotate-piece dirn piece0 plf)
+  (let* ([shape-name (piece-shape-name piece0)]
+         [rot0 (piece-rotation piece0)]
+         [new-rot (add-rotation rot0 dirn)]
+         [kick-table (hash-ref h-shape-name-to-kick-data shape-name)]
+         [kick-list (hash-ref kick-table `(,rot0 . ,new-rot))]
+         [try-kick  ; return #t if this kick doesn't fail, else #f
+          (lambda (k)
+            (let* ([kicked-piece (piece-move piece0 k)]
+                   [new-piece (piece-rotate kicked-piece dirn)]
+                   [overlapping (piece-overlapping? new-piece plf)])
+              (not overlapping)))]
+         [memf-result (memf try-kick kick-list)])
+    (if (list? memf-result)
+        (let* ([posn0 (piece-posn piece0)]
+               [kick (car memf-result)]
+               [delta-posn (make-posn (car kick) (cadr kick))]
+               [new-posn (posn+ posn0 delta-posn)])
+          (struct-copy piece piece0
+                       [posn new-posn]
+                       [rotation new-rot]))
+        piece0)))
+
+; Test
+[define p0 (make-piece (make-posn 0 2) 'J 0)]
+[define p1 (make-piece (make-posn 1 0) 'J 3)]
+[define plf (list (make-block (make-posn 0 0) 'gray)
+                  (make-block (make-posn 0 2) 'gray)
+                  (make-block (make-posn 2 4) 'gray))]
+(check-equal? (try-rotate-piece 'ccw p0 plf) p1)
+
+[define p2 (make-piece (make-posn 0 2) 'J 0)]
+[define p3 (make-piece (make-posn -1 3) 'J 1)]
+[define plf2 (list (make-block (make-posn 0 0) 'gray)
+            (make-block (make-posn 0 2) 'gray)
+            (make-block (make-posn 2 4) 'gray))]
+;; (beside (draw-tetris (make-tetris p2 plf2))
+;;         (draw-tetris (make-tetris p3 plf2)))
+(check-equal? (try-rotate-piece 'cw p2 plf2) p3)
 
 
 ; Block Playfield -> Block
 ; Return the block after it was moved down as much as possible
 (define (soft-drop piece plf)
-  (let* ([new-piece (move-piece-maybe 'down piece plf)]
+  (let* ([new-piece (try-move-piece 'down piece plf)]
          [same (equal? piece new-piece)])
     (if same piece
         (soft-drop new-piece plf))))
@@ -443,7 +556,7 @@
 (define (drop-piece-or-lock tetris)
   (let* ([piece (tetris-piece tetris)]
          [plf (tetris-playfield tetris)]
-         [new-piece (move-piece-maybe 'down piece plf)]
+         [new-piece (try-move-piece 'down piece plf)]
          [landed (equal? (piece-posn piece) (piece-posn new-piece))])
     (if landed
         (make-tetris (spawn-piece) (de-nest (list (piece-blocks piece) plf)))
@@ -467,15 +580,15 @@
      [(key=? k " ")
       (make-tetris (soft-drop piece plf) plf)]
      [(key=? k "left")
-      (make-tetris (move-piece-maybe 'left piece plf) plf)]
+      (make-tetris (try-move-piece 'left piece plf) plf)]
      [(key=? k "right")
-      (make-tetris (move-piece-maybe 'right piece plf) plf)]
+      (make-tetris (try-move-piece 'right piece plf) plf)]
      [(or (key=? k "up") (key=? k "x"))
-      (make-tetris (move-piece-maybe 'rotate-cw piece plf) plf)]
+      (make-tetris (try-rotate-piece 'cw piece plf) plf)]
      [(key=? k "z")
-      (make-tetris (move-piece-maybe 'rotate-ccw piece plf) plf)]
-     [(key=? k "a")
-      (make-tetris (move-piece-maybe 'rotate-180 piece plf) plf)]
+      (make-tetris (try-rotate-piece 'ccw piece plf) plf)]
+     ;; [(key=? k "a")
+     ;;  (make-tetris (try-move-piece 'rotate-180 piece plf) plf)]
      [else w])))
 
 
