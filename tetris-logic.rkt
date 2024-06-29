@@ -5,8 +5,16 @@
 (require racket/list)
 
 (require rackunit)
-(require 2htdp/universe)
 (require 2htdp/image)
+
+(provide tetris-init
+         (struct-out tetris)
+         tetris-soft-drop
+         tetris-move-piece
+         tetris-rotate-piece
+         draw-tetris
+         tetris-on-tick
+         )
 
 ;;;;;;;;;;;
 ;; Utils ;;
@@ -216,6 +224,7 @@
 (define piece0 (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0))
 (define tetris0 (make-tetris piece0 playfield0))
 (define playfield1 `(,(make-block (make-posn 0 0) 'gray)))
+
 
 (define (spawn-piece)
   (make-piece (make-posn 5 (- HEIGHT 3))
@@ -484,8 +493,8 @@
 (check-equal? (try-rotate-piece 'cw p2 plf2) p3)
 
 
-; Block Playfield -> Block
-; Return the block after it was moved down as much as possible
+; Piece Playfield -> Piece
+; Return the Piece after it was moved down as much as possible
 (define (soft-drop piece plf)
   (let* ([new-piece (try-move-piece 'down piece plf)]
          [same (equal? piece new-piece)])
@@ -493,6 +502,7 @@
         (soft-drop new-piece plf))))
 (check-equal? (soft-drop (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0) '())
               (make-piece (make-posn 5 -1) 'L 0))
+
 
 
 (define plf-full1 `(,@(build-list 10 (lambda (x) (make-block (make-posn x 0) 'gray)))
@@ -565,6 +575,21 @@
         (make-tetris new-piece (tetris-playfield tetris)))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; Exported functions ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+; _ -> Tetris
+(define (tetris-init)
+  (make-tetris (spawn-piece) '()))
+
+
+; Tetris -> Tetris
+(define (tetris-soft-drop t)
+  (struct-copy tetris t
+               [piece (soft-drop (tetris-piece t) (tetris-playfield t))]))
+
+
 ; Tetris -> Tetris
 (define (tetris-on-tick tetris)
   (let* ([t1 (drop-piece-or-lock tetris)]
@@ -574,30 +599,13 @@
     (make-tetris b1 plf-cleared)))
 
 
-; Tetris, Key -> Tetris
-(define (tetris-on-key w k)
-  (let* ([piece (tetris-piece w)]
-         [plf (tetris-playfield w)])
-    (cond
-     [(key=? k " ")
-      (make-tetris (soft-drop piece plf) plf)]
-     [(key=? k "left")
-      (make-tetris (try-move-piece 'left piece plf) plf)]
-     [(key=? k "right")
-      (make-tetris (try-move-piece 'right piece plf) plf)]
-     [(or (key=? k "up") (key=? k "x"))
-      (make-tetris (try-rotate-piece 'cw piece plf) plf)]
-     [(key=? k "z")
-      (make-tetris (try-rotate-piece 'ccw piece plf) plf)]
-     ;; [(key=? k "a")
-     ;;  (make-tetris (try-move-piece 'rotate-180 piece plf) plf)]
-     [else w])))
+; Tetris, Or['left 'right] -> Tetris
+(define (tetris-move-piece t dirn)
+  (struct-copy tetris t
+               [piece (try-move-piece dirn (tetris-piece t) (tetris-playfield t))]))
 
 
-(define (tetris-start) (make-tetris (spawn-piece) '()))
-
-(define (main tick-durn)
-  (big-bang (tetris-start)
-            [on-tick tetris-on-tick tick-durn]
-            [to-draw draw-tetris]
-            [on-key tetris-on-key]))
+; Tetris, RotateDirection -> Tetris
+(define (tetris-rotate-piece t dirn)
+  (struct-copy tetris t
+               [piece (try-rotate-piece dirn (tetris-piece t) (tetris-playfield t))]))
