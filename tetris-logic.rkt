@@ -8,6 +8,7 @@
 (require 2htdp/image)
 
 (lazy-require ["tetris-draw.rkt" (draw-tetris)])
+(require "utils.rkt")
 
 (provide
  WIDTH HEIGHT
@@ -22,50 +23,6 @@
 ;; Grid size
 (define WIDTH 10)
 (define HEIGHT 20)
-
-;;;;;;;;;;;
-;; Utils ;;
-;;;;;;;;;;;
-
-
-; Any List -> Bool
-; returns True if value es in list
-(define (member? el ls)
-  (ormap [λ (s) (equal? s el)] ls))
-
-
-; Function(Any -> Boolean) List -> Bool
-; Returns true if any member of the list satisfies given function
-; when passed as an argument to it
-(define (any-satisfies? fun l)
-  (ormap [λ (elem) (fun elem)] l))
-
-
-; List -> Any
-; Return a random item from the list
-(define (random-choice l)
-  (list-ref l (random (length l))))
-
-
-; List of Lists -> List
-; Flatten one level of nesting
-(define (de-nest lss)
-  (foldr
-   (λ (ls xs)
-     (foldr cons xs ls))
-   '() lss))
-
-
-; List of Lists -> List of Lists
-; Transpose a matrix
-(define (transpose ll)
-  (apply map list ll))
-
-
-; List of Lists -> List of Lists
-; Rotate matrix 90 degrees
-(define (rotate90 ll)
-  (map reverse (transpose ll)))
 
 
 ;;;;;;;;;;;;
@@ -192,9 +149,9 @@
 ;                (ShapeName rot-2) Shape-2 ...) for every rot in Rotation
 (define (h-piece-rot shape-name)
   (let* ([shape (hash-ref pieces shape-name)]
-         [shape90 (rotate90 shape)]
-         [shape180 (rotate90 shape90)]
-         [shape270 (rotate90 shape180)])
+         [shape90 (matrix-rotate-cw shape)]
+         [shape180 (matrix-rotate-cw shape90)]
+         [shape270 (matrix-rotate-cw shape180)])
     `(((,shape-name 0) . ,shape)
       ((,shape-name 1) . ,shape90)
       ((,shape-name 2) . ,shape180)
@@ -440,10 +397,10 @@
                    [new-piece (piece-rotate kicked-piece dirn)]
                    [overlapping (piece-overlapping? new-piece plf)])
               (not overlapping)))]
-         [memf-result (memf try-kick kick-list)])
-    (if (list? memf-result)
+         [kick-search-result (memf try-kick kick-list)])
+    (if (list? kick-search-result)
         (let* ([posn0 (piece-posn piece0)]
-               [kick (car memf-result)]
+               [kick (car kick-search-result)]
                [delta-posn (make-posn (car kick) (cadr kick))]
                [new-posn (posn+ posn0 delta-posn)])
           (struct-copy piece piece0
@@ -513,13 +470,6 @@
               '(0 2))
 
 
-; Number, List of Numbers -> Integer
-; Count how many numbers in the list are smaller than the given number n
-(define (count-less n l)
-  (foldl + 0 (map (λ (x) (if (< x n) 1 0)) l)))
-(check-equal? (count-less 5 '(0 2 5 6)) 2)
-
-
 ; Playfield -> Playfield
 ; Clear the completed tetris lines.
 ; the lines above the completed ones get shifted down.
@@ -545,10 +495,10 @@
                        ,(make-block (make-posn 4 1) 'blue)))
 (check-equal? (clear-lines plf-full1) plf-cleared1)
 ; See this diagram for a visual explanation
-;; (define clear-lines-explanation
-;;   (beside (tetris-draw plf-full1)
-;;           (text " Clear lines -> " 25 'black)
-;;           (tetris-draw plf-cleared1)))
+(define clear-lines-explanation
+  (beside (draw-tetris plf-full1)
+          (text " Clear lines -> " 25 'black)
+          (draw-tetris plf-cleared1)))
 
 
 ; Tetris -> Tetris
