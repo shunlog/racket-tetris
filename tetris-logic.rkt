@@ -7,28 +7,31 @@
 (require rackunit)
 (require 2htdp/image)
 
-(provide tetris-init
-         (struct-out tetris)
+(provide (struct-out tetris)
+         tetris-init
          tetris-soft-drop
          tetris-move-piece
          tetris-rotate-piece
-         draw-tetris
          tetris-on-tick
-         )
+         draw-tetris)
 
 ;;;;;;;;;;;
 ;; Utils ;;
 ;;;;;;;;;;;
 
+
 ; Any List -> Bool
-(define (member? str strs)
-  (ormap [lambda (s) (equal? s str)] strs))
+; returns True if value es in list
+(define (member? el ls)
+  (ormap [lambda (s) (equal? s el)] ls))
+
 
 ; Function(Any -> Boolean) List -> Bool
 ; Returns true if any member of the list satisfies given function
 ; when passed as an argument to it
 (define (any-satisfies? fun l)
   (ormap [lambda (elem) (fun elem)] l))
+
 
 ; List -> Any
 ; Return a random item from the list
