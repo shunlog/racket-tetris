@@ -8,12 +8,12 @@
 ; Tetris, Key -> Tetris
 (define (tetris-on-key t k)
   (cond
-    [(key=? k " ") (tetris-soft-drop t)]
-    [(key=? k "left") (tetris-move-piece t 'left)]
-    [(key=? k "right") (tetris-move-piece t 'right)]
-    [(or (key=? k "up") (key=? k "x")) (tetris-rotate-piece t 'cw)]
-    [(key=? k "z") (tetris-rotate-piece t 'ccw)]
-    [(key=? k "a") (tetris-rotate-piece t 180)]
+    [(key=? k " ") (tetris-move t 'soft-drop)]
+    [(key=? k "left") (tetris-move t 'left)]
+    [(key=? k "right") (tetris-move t 'right)]
+    [(or (key=? k "up") (key=? k "x")) (tetris-move t 'cw)]
+    [(key=? k "z") (tetris-move t 'ccw)]
+    [(key=? k "a") (tetris-move t 180)]
     [else t]))
 
 

@@ -15,9 +15,7 @@
  (struct-out block)
  tetris-init
  tetris-blocks
- tetris-soft-drop
- tetris-move-piece
- tetris-rotate-piece
+ tetris-move
  tetris-on-tick)
 
 
@@ -223,7 +221,8 @@
 ;
 ; (make-tetris b0 (list b1 b2 ...)) means b0 is the
 ; dropping Block, while b1, b2, and ... are the resting Blocks
-(define-struct tetris [piece playfield] #:transparent)
+(define-struct tetris (piece playfield)
+  #:transparent)
 
 
 ;; Examples:
@@ -569,15 +568,10 @@
 ;; Exported functions ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
 
+
 ; _ -> Tetris
 (define (tetris-init)
   (make-tetris (spawn-piece) '()))
-
-
-; Tetris -> Tetris
-(define (tetris-soft-drop t)
-  (struct-copy tetris t
-               [piece (soft-drop (tetris-piece t) (tetris-playfield t))]))
 
 
 ; Tetris -> Tetris
@@ -589,22 +583,16 @@
     (make-tetris b1 plf-cleared)))
 
 
-; Tetris, Or['left 'right] -> Tetris
-(define (tetris-move-piece t dirn)
-  (let* ([p (tetris-piece t)]
-         [plf (tetris-playfield t)]
-         [new-piece (try-move-piece dirn p plf)])
-    (struct-copy tetris t [piece new-piece])))
-
-
-; Tetris, Or('cw, 'ccw, 180) -> Tetris
-(define (tetris-rotate-piece t dirn)
+; Tetris, Move -> Tetris
+; Move is one of '(left right cw ccw 180 soft-drop)
+(define (tetris-move t mov)
   (let* ([p (tetris-piece t)]
          [plf (tetris-playfield t)]
          [new-piece
-          (cond [(or (eq? dirn 'cw) (eq? dirn 'ccw))
-                 (try-rotate-piece dirn p plf)]
-                [(eq? dirn 180)
-                 (try-rotate-piece-180 p plf)]
-                [else (error "Invalid argument for direction.")])])
+          (cond
+            [(or (eq? mov 'left) (eq? mov 'right)) (try-move-piece mov p plf)]
+            [(or (eq? mov 'cw) (eq? mov 'ccw)) (try-rotate-piece mov p plf)]
+            [(eq? mov 180) (try-rotate-piece-180 p plf)]
+            [(eq? mov 'soft-drop) (soft-drop p plf)]
+            [else (error "Invalid argument for move.")])])
     (struct-copy tetris t [piece new-piece])))
