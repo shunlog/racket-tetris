@@ -33,14 +33,14 @@
 ; Any List -> Bool
 ; returns True if value es in list
 (define (member? el ls)
-  (ormap [lambda (s) (equal? s el)] ls))
+  (ormap [λ (s) (equal? s el)] ls))
 
 
 ; Function(Any -> Boolean) List -> Bool
 ; Returns true if any member of the list satisfies given function
 ; when passed as an argument to it
 (define (any-satisfies? fun l)
-  (ormap [lambda (elem) (fun elem)] l))
+  (ormap [λ (elem) (fun elem)] l))
 
 
 ; List -> Any
@@ -53,7 +53,7 @@
 ; Flatten one level of nesting
 (define (de-nest lss)
   (foldr
-   (lambda (ls xs)
+   (λ (ls xs)
      (foldr cons xs ls))
    '() lss))
 
@@ -208,7 +208,7 @@
 (define h-pieces-rot
   (make-immutable-hash
    (de-nest
-    (map (lambda (piece-name) (h-piece-rot piece-name))
+    (map (λ (piece-name) (h-piece-rot piece-name))
          shape-names))))
 
 
@@ -243,9 +243,9 @@
 ; Return all 2-combinations of 2 ranges of numbers
 (define (combinations N M)
   (de-nest
-   (map (lambda (y) (map list
+   (map (λ (y) (map list
                          (build-list N identity)
-                         (build-list N (lambda (_) y))))
+                         (build-list N (λ (_) y))))
         (build-list M identity))))
 (check-equal? (combinations 2 4)
               '((0 0) (1 0) (0 1) (1 1) (0 2) (1 2) (0 3) (1 3)))
@@ -257,13 +257,13 @@
 (define (shape-to-coords m)
   (let* ([len (length m)]
          [block-at?
-          (lambda (posn)
+          (λ (posn)
             (let* ([x (car posn)]
                    [y (second posn)]
                    [h (length m)])
               (list-ref (list-ref m (- h y 1)) x)))])
     (filter block-at? (combinations len len))))
-(check-equal?  (andmap (lambda (p) (member? p '((0 1) (1 1) (2 1) (2 2))))
+(check-equal?  (andmap (λ (p) (member? p '((0 1) (1 1) (2 1) (2 2))))
                        (shape-to-coords (hash-ref pieces 'L)))
                #t)
 
@@ -277,7 +277,7 @@
                             ,(piece-rotation piece)))]
          [coords (shape-to-coords sh)]
          [sh-color (hash-ref h-shape-color sh-name)])
-    (map (lambda (coord)
+    (map (λ (coord)
            (make-block
             (make-posn (+ (first coord) (posn-x (piece-posn piece)))
                        (+ (second coord) (posn-y (piece-posn piece))))
@@ -336,7 +336,7 @@
 ; Piece, Playfield -> Boolean
 ; Return true if any block in the piece is overlapping in the Playfield
 (define (piece-overlapping? p plf)
-  (ormap (lambda (b)
+  (ormap (λ (b)
            (block-overlapping? b plf))
          (piece-blocks p)))
 (check-equal? (piece-overlapping? (make-piece (make-posn 5 5) 'L 0) '()) #f)
@@ -436,7 +436,7 @@
          [kick-table (hash-ref h-shape-name-to-kick-data shape-name)]
          [kick-list (hash-ref kick-table `(,rot0 . ,new-rot))]
          [try-kick  ; return #t if this kick doesn't fail, else #f
-          (lambda (k)
+          (λ (k)
             (let* ([kicked-piece (piece-move piece0 k)]
                    [new-piece (piece-rotate kicked-piece dirn)]
                    [overlapping (piece-overlapping? new-piece plf)])
@@ -495,18 +495,18 @@
 
 
 
-(define plf-full1 `(,@(build-list 10 (lambda (x) (make-block (make-posn x 0) 'gray)))
+(define plf-full1 `(,@(build-list 10 (λ (x) (make-block (make-posn x 0) 'gray)))
                  ,(make-block (make-posn 5 1) 'gray)
-                 ,@(build-list 10 (lambda (x) (make-block (make-posn x 2) 'gray)))
+                 ,@(build-list 10 (λ (x) (make-block (make-posn x 2) 'gray)))
                  ,(make-block (make-posn 4 3) 'blue)))
 
 ; Playfield -> List of Integers
 ; Returns a list of row indeces that represent completed lines
 (define (complete-lines plf)
   (let* ([line-complete? ;;  Returns true if line with index y is complete
-          (lambda (y)
-            (andmap (lambda (x) (any-satisfies?
-                                 (lambda (b) (equal? (block-posn b) (make-posn x y)))
+          (λ (y)
+            (andmap (λ (x) (any-satisfies?
+                                 (λ (b) (equal? (block-posn b) (make-posn x y)))
                                  plf))
                     (build-list WIDTH identity)))])
     (filter line-complete? (build-list HEIGHT identity))))
@@ -517,7 +517,7 @@
 ; Number, List of Numbers -> Integer
 ; Count how many numbers in the list are smaller than the given number n
 (define (count-less n l)
-  (foldl + 0 (map (lambda (x) (if (< x n) 1 0)) l)))
+  (foldl + 0 (map (λ (x) (if (< x n) 1 0)) l)))
 (check-equal? (count-less 5 '(0 2 5 6)) 2)
 
 
@@ -528,16 +528,16 @@
   (let* ([complete-lines-list (complete-lines plf)]
          ;; List of blocks that remain after clearing the complete lines
          [remaining-blocks (filter
-                            (lambda (b) (not (member? (posn-y (block-posn b)) complete-lines-list)))
+                            (λ (b) (not (member? (posn-y (block-posn b)) complete-lines-list)))
                             plf)]
-         [new-y-fun (lambda (b)
+         [new-y-fun (λ (b)
                       (- (posn-y (block-posn b))
                          (count-less
                           (posn-y (block-posn b))
                           complete-lines-list)))]
          ;; Move the block down as many lines as there are completed lines below
          [move-down-fun
-          (lambda (b) (struct-copy block b
+          (λ (b) (struct-copy block b
                                    [posn (make-posn (posn-x (block-posn b))
                                                     (new-y-fun b))]))])
     (map move-down-fun remaining-blocks)))
