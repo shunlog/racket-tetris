@@ -1,6 +1,8 @@
 #lang racket/base
 
 (require "tetris-logic.rkt")
+(require "tetris-draw.rkt")
+
 (require 2htdp/universe)
 
 ; Tetris, Key -> Tetris
@@ -11,8 +13,7 @@
     [(key=? k "right") (tetris-move-piece t 'right)]
     [(or (key=? k "up") (key=? k "x")) (tetris-rotate-piece t 'cw)]
     [(key=? k "z") (tetris-rotate-piece t 'ccw)]
-    ;; [(key=? k "a")
-    ;;  (make-tetris (try-move-piece 'rotate-180 piece plf) plf)]
+    [(key=? k "a") (tetris-rotate-piece t 180)]
     [else t]))
 
 

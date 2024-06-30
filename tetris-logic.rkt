@@ -3,17 +3,27 @@
 (require lang/posn)
 (require racket/function)
 (require racket/list)
-
 (require rackunit)
+(require racket/lazy-require)
 (require 2htdp/image)
 
-(provide (struct-out tetris)
-         tetris-init
-         tetris-soft-drop
-         tetris-move-piece
-         tetris-rotate-piece
-         tetris-on-tick
-         draw-tetris)
+(lazy-require ["tetris-draw.rkt" (draw-tetris)])
+
+(provide
+ WIDTH HEIGHT
+ (struct-out tetris)
+ (struct-out block)
+ tetris-init
+ tetris-blocks
+ tetris-soft-drop
+ tetris-move-piece
+ tetris-rotate-piece
+ tetris-on-tick)
+
+
+;; Grid size
+(define WIDTH 10)
+(define HEIGHT 20)
 
 ;;;;;;;;;;;
 ;; Utils ;;
@@ -69,23 +79,6 @@
 ; y increases to the top
 ; so the (0, 0) coordinate is in the bottom-left corner
 
-; image of a Block
-(define BLOCK-SIZE 20) ; blocks are squares
-(define (block-img color)
-  (overlay
-   (pulled-regular-polygon BLOCK-SIZE 4 1/8 30 "solid" color)
-   (overlay
-    (square (- BLOCK-SIZE 1) "solid" "black")
-    (square BLOCK-SIZE "outline" "black"))))
-
-;; Grid size
-(define WIDTH 10)
-(define HEIGHT 20)
-(define PLAYFIELD-WIDTH (* WIDTH BLOCK-SIZE))
-(define PLAYFIELD-HEIGHT (* HEIGHT BLOCK-SIZE))
-
-; image of empty Playfield
-(define EMPTY-PLAYFIELD (empty-scene PLAYFIELD-WIDTH PLAYFIELD-HEIGHT))
 
 ; A Block is a structure:
 ;   (make-block Posn)
@@ -132,7 +125,6 @@
   (let* ([rot-count
           (cond [(eq? 'cw rot) 1]
                 [(eq? 'ccw rot) -1]
-                [(eq? 180 rot) 2]
                 [(integer? rot) rot]
                 [else (error "Invalid rotation argument")])]
          [rot0 (piece-rotation p)]
@@ -140,6 +132,18 @@
     (struct-copy piece p [rotation new-rot])))
 (check-equal? (piece-rotate (make-piece (make-posn 1 2) 'L 0) -1)
               (make-piece (make-posn 1 2) 'L 3))
+
+
+; Or(Tetris / Piece / Playfield) -> List of Blocks
+; Convert any data into a list of Blocks
+(define (tetris-blocks t)
+  (cond
+    [(tetris? t) (de-nest (list (piece-blocks (tetris-piece t))
+                                (tetris-playfield t)))]
+    [(piece? t) (piece-blocks (tetris-piece t))]
+    [(list? t) t]
+    [else '()]))
+
 
 ;;;;;;;;;;;;
 ;; Shapes ;;
@@ -235,16 +239,6 @@
               0))
 
 
-;; Block, Image -> Image
-;; Draw a Block onto the playfield image
-(define (draw-block b scene)
-  (underlay/xy scene
-               (* (posn-x (block-posn b)) BLOCK-SIZE)
-               (- PLAYFIELD-HEIGHT
-                  (* (+ (posn-y (block-posn b)) 1) BLOCK-SIZE))
-               (block-img (block-color b))))
-
-
 ; Number, Number -> List of Pairs
 ; Return all 2-combinations of 2 ranges of numbers
 (define (combinations N M)
@@ -299,26 +293,6 @@
                                 ,(make-block (make-posn 2 6) 'gray)
                                 ,(make-block (make-posn 3 6) 'gray)
                                 ,(make-block (make-posn 1 7) 'gray))))
-
-
-; List of Blocks -> Image
-; Draw the list of Blocks on the Playfield
-(define (draw-blocks blocks)
-  (foldl draw-block EMPTY-PLAYFIELD
-         blocks))
-
-
-; Piece, Image -> Image
-; Draw a Piece onto the Playfield image
-(define (draw-piece p)
-  (draw-blocks (piece-blocks p)))
-
-
-;; Tetris -> Image
-;; Draw a Tetris playfieled
-(define (draw-tetris tetris)
-  (draw-blocks (de-nest (list (piece-blocks (tetris-piece tetris))
-                              (tetris-playfield tetris)))))
 
 
 ; Block Playfield -> Boolean
@@ -491,9 +465,22 @@
 [define plf2 (list (make-block (make-posn 0 0) 'gray)
             (make-block (make-posn 0 2) 'gray)
             (make-block (make-posn 2 4) 'gray))]
-;; (beside (draw-tetris (make-tetris p2 plf2))
-;;         (draw-tetris (make-tetris p3 plf2)))
+(define rotate-test
+  (beside (draw-tetris (make-tetris p2 plf2))
+          (draw-tetris (make-tetris p3 plf2))))
 (check-equal? (try-rotate-piece 'cw p2 plf2) p3)
+
+
+; Piece, Playfield -> Piece
+; Return the piece rotated a 2 times, but only if both times succeeded
+; Otherwise return the original piece
+(define (try-rotate-piece-180 p plf)
+  (let* ([rotated1 (try-rotate-piece 'cw p plf)]
+         [rotated2 (try-rotate-piece 'cw rotated1 plf)])
+    (if (or (equal? p rotated1)
+            (equal? rotated1 rotated2))
+        p
+        rotated2)))
 
 
 ; Piece Playfield -> Piece
@@ -559,10 +546,10 @@
                        ,(make-block (make-posn 4 1) 'blue)))
 (check-equal? (clear-lines plf-full1) plf-cleared1)
 ; See this diagram for a visual explanation
-(define clear-lines-explanation
-  (beside (draw-blocks plf-full1)
-          (text " Clear lines -> " 25 'black)
-          (draw-blocks plf-cleared1)))
+;; (define clear-lines-explanation
+;;   (beside (tetris-draw plf-full1)
+;;           (text " Clear lines -> " 25 'black)
+;;           (tetris-draw plf-cleared1)))
 
 
 ; Tetris -> Tetris
@@ -604,11 +591,20 @@
 
 ; Tetris, Or['left 'right] -> Tetris
 (define (tetris-move-piece t dirn)
-  (struct-copy tetris t
-               [piece (try-move-piece dirn (tetris-piece t) (tetris-playfield t))]))
+  (let* ([p (tetris-piece t)]
+         [plf (tetris-playfield t)]
+         [new-piece (try-move-piece dirn p plf)])
+    (struct-copy tetris t [piece new-piece])))
 
 
-; Tetris, RotateDirection -> Tetris
+; Tetris, Or('cw, 'ccw, 180) -> Tetris
 (define (tetris-rotate-piece t dirn)
-  (struct-copy tetris t
-               [piece (try-rotate-piece dirn (tetris-piece t) (tetris-playfield t))]))
+  (let* ([p (tetris-piece t)]
+         [plf (tetris-playfield t)]
+         [new-piece
+          (cond [(or (eq? dirn 'cw) (eq? dirn 'ccw))
+                 (try-rotate-piece dirn p plf)]
+                [(eq? dirn 180)
+                 (try-rotate-piece-180 p plf)]
+                [else (error "Invalid argument for direction.")])])
+    (struct-copy tetris t [piece new-piece])))
