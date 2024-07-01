@@ -14,10 +14,12 @@
  WIDTH HEIGHT
  (struct-out tetris)
  (struct-out block)
+ (struct-out piece)
  tetris-init
- tetris-blocks
  tetris-move
- tetris-on-tick)
+ tetris-on-tick
+ piece-blocks
+ tetris-ghost-blocks)
 
 
 ;; Grid size
@@ -36,10 +38,12 @@
 
 
 ; A Block is a structure:
-;   (make-block Posn)
+;   (make-block Posn ColorType)
+; ColorType is one of the shape names, or 'ghost
 ;
-; (make-block (make-posn x y)) depicts a block at position (x, y) in the grid,
-; where (0, 0) marks the bottom-left position in the playfield
+; (make-block (make-posn x y) 'L) depicts a block at position (x, y) in the grid,
+;     where (0, 0) marks the bottom-left position in the playfield
+;     and that should be colored like the L shape
 (define-struct block [posn color] #:transparent)
 
 
@@ -89,15 +93,20 @@
               (make-piece (make-posn 1 2) 'L 3))
 
 
-; Or(Tetris / Piece / Playfield) -> List of Blocks
-; Convert any data into a list of Blocks
-(define (tetris-blocks t)
-  (cond
-    [(tetris? t) (de-nest (list (piece-blocks (tetris-piece t))
-                                (tetris-playfield t)))]
-    [(piece? t) (piece-blocks (tetris-piece t))]
-    [(list? t) t]
-    [else '()]))
+; Tetris -> Piece
+(define (tetris-ghost-piece t)
+  (let* ([p (tetris-piece t)]
+         [ghostY  (tetris-ghostY t)]
+         [pieceX (posn-x (piece-posn p))]
+         [ghost-posn (make-posn pieceX ghostY)])
+    (struct-copy piece p
+                 [posn ghost-posn])))
+
+
+; Tetris -> List of Blocks
+(define (tetris-ghost-blocks t)
+  (map (lambda (b) (struct-copy block b [color 'ghost]))
+       (piece-blocks (tetris-ghost-piece t))))
 
 
 ;;;;;;;;;;;;
@@ -108,14 +117,6 @@
 ; A Piece occupies those blocks for which the Shape has a value of True
 ; The Shape's bottom-left corner coincides with the Piece's position
 
-(define h-shape-color
-  (make-immutable-hash '((L . orange)
-                         (J . "Royal Blue")
-                         (Z . red)
-                         (S . green)
-                         (T . "Light Purple")
-                         (O . yellow)
-                         (I . "Medium Cyan"))))
 
 ; We pre-compute all the shapes rotations for a slight optimization,
 ; and maybe as an exercise
@@ -173,20 +174,29 @@
 
 
 ; A Tetris is a structure:
-;   (make-tetris Piece Playfield)
+;   (make-tetris Piece Playfield GhostY)
 ; A Playfield is a list of Blocks
+; GhostY is an Integer
 ;
-; (make-tetris b0 (list b1 b2 ...)) means b0 is the
-; dropping Block, while b1, b2, and ... are the resting Blocks
-(define-struct tetris (piece playfield)
+; (make-tetris p0 (list b1 b2 ...) Y)
+;     p0 is the active Piece,
+;     b1, b2, and ... are the resting Blocks,
+;     Y is the height at which to draw the ghost of the active piece
+;
+; Keeping GhostY in the state is necessary for optimal drawing the ghost piece,
+; otherwise we'd have to compute it on every tick, which is a bit wasteful.
+; However, it also means we must be careful to always update GhostY
+; whenever we move or rotate the piece, except when we drop it down
+
+(define-struct tetris (piece playfield ghostY)
   #:transparent)
 
 
 ;; Examples:
 (define playfield0 `())
 (define piece0 (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0))
-(define tetris0 (make-tetris piece0 playfield0))
-(define playfield1 `(,(make-block (make-posn 0 0) 'gray)))
+(define tetris0 (make-tetris piece0 playfield0 -1))
+(define playfield1 `(,(make-block (make-posn 0 0) 'ghost)))
 
 
 (define (spawn-piece)
@@ -229,26 +239,25 @@
 (define (piece-blocks piece)
   (let* ([sh-name (piece-shape-name piece)]
          [sh (hash-ref h-pieces-rot
-                          `(,sh-name
-                            ,(piece-rotation piece)))]
-         [coords (shape-to-coords sh)]
-         [sh-color (hash-ref h-shape-color sh-name)])
+                       `(,sh-name
+                         ,(piece-rotation piece)))]
+         [coords (shape-to-coords sh)])
     (map (λ (coord)
            (make-block
             (make-posn (+ (first coord) (posn-x (piece-posn piece)))
                        (+ (second coord) (posn-y (piece-posn piece))))
-            sh-color))
+            sh-name))
          coords)))
 (check-equal? (map block-posn (piece-blocks (make-piece (make-posn 0 0) 'L 0)))
-              (map block-posn `(,(make-block (make-posn 0 1) 'gray)
-                                ,(make-block (make-posn 1 1) 'gray)
-                                ,(make-block (make-posn 2 1) 'gray)
-                                ,(make-block (make-posn 2 2) 'gray))))
+              (map block-posn `(,(make-block (make-posn 0 1) 'ghost)
+                                ,(make-block (make-posn 1 1) 'ghost)
+                                ,(make-block (make-posn 2 1) 'ghost)
+                                ,(make-block (make-posn 2 2) 'ghost))))
 (check-equal? (map block-posn (piece-blocks (make-piece (make-posn 1 5) 'J 0)))
-              (map block-posn `(,(make-block (make-posn 1 6) 'gray)
-                                ,(make-block (make-posn 2 6) 'gray)
-                                ,(make-block (make-posn 3 6) 'gray)
-                                ,(make-block (make-posn 1 7) 'gray))))
+              (map block-posn `(,(make-block (make-posn 1 6) 'ghost)
+                                ,(make-block (make-posn 2 6) 'ghost)
+                                ,(make-block (make-posn 3 6) 'ghost)
+                                ,(make-block (make-posn 1 7) 'ghost))))
 
 
 ; Block Playfield -> Boolean
@@ -260,10 +269,10 @@
     [else (or (equal? (block-posn b) (block-posn (first plf)))
               (block-overlapping-playfield? b (rest plf)))]))
 (check-equal?
- (block-overlapping-playfield? (make-block (make-posn 0 1) 'gray) (list (make-block (make-posn 0 0) 'gray)))
+ (block-overlapping-playfield? (make-block (make-posn 0 1) 'ghost) (list (make-block (make-posn 0 0) 'ghost)))
  #f)
 (check-equal?
- (block-overlapping-playfield? (make-block (make-posn 0 0) 'gray) (list (make-block (make-posn 0 0) 'gray)))
+ (block-overlapping-playfield? (make-block (make-posn 0 0) 'ghost) (list (make-block (make-posn 0 0) 'ghost)))
  #t)
 
 
@@ -274,11 +283,11 @@
       (>= (posn-x (block-posn b)) WIDTH)
       (< (posn-y (block-posn b)) 0)
       (>= (posn-y (block-posn b)) HEIGHT)))
-(check-equal? (block-outside-playfield? (make-block (make-posn -1 0) 'gray)) #t)
-(check-equal? (block-outside-playfield? (make-block (make-posn WIDTH 0) 'gray)) #t)
-(check-equal? (block-outside-playfield? (make-block (make-posn 0 HEIGHT) 'gray)) #t)
-(check-equal? (block-outside-playfield? (make-block (make-posn 0 -1) 'gray)) #t)
-(check-equal? (block-outside-playfield? (make-block (make-posn 0 0) 'gray)) #f)
+(check-equal? (block-outside-playfield? (make-block (make-posn -1 0) 'ghost)) #t)
+(check-equal? (block-outside-playfield? (make-block (make-posn WIDTH 0) 'ghost)) #t)
+(check-equal? (block-outside-playfield? (make-block (make-posn 0 HEIGHT) 'ghost)) #t)
+(check-equal? (block-outside-playfield? (make-block (make-posn 0 -1) 'ghost)) #t)
+(check-equal? (block-outside-playfield? (make-block (make-posn 0 0) 'ghost)) #f)
 
 
 ; Block Playfield -> Boolean
@@ -411,19 +420,19 @@
 ; Test
 [define p0 (make-piece (make-posn 0 2) 'J 0)]
 [define p1 (make-piece (make-posn 1 0) 'J 3)]
-[define plf (list (make-block (make-posn 0 0) 'gray)
-                  (make-block (make-posn 0 2) 'gray)
-                  (make-block (make-posn 2 4) 'gray))]
+[define plf (list (make-block (make-posn 0 0) 'ghost)
+                  (make-block (make-posn 0 2) 'ghost)
+                  (make-block (make-posn 2 4) 'ghost))]
 (check-equal? (try-rotate-piece 'ccw p0 plf) p1)
 
 [define p2 (make-piece (make-posn 0 2) 'J 0)]
 [define p3 (make-piece (make-posn -1 3) 'J 1)]
-[define plf2 (list (make-block (make-posn 0 0) 'gray)
-            (make-block (make-posn 0 2) 'gray)
-            (make-block (make-posn 2 4) 'gray))]
+[define plf2 (list (make-block (make-posn 0 0) 'ghost)
+            (make-block (make-posn 0 2) 'ghost)
+            (make-block (make-posn 2 4) 'ghost))]
 (define rotate-test
-  (beside (draw-tetris (make-tetris p2 plf2))
-          (draw-tetris (make-tetris p3 plf2))))
+  (beside (draw-tetris (make-tetris p2 plf2 0))
+          (draw-tetris (make-tetris p3 plf2 0))))
 (check-equal? (try-rotate-piece 'cw p2 plf2) p3)
 
 
@@ -451,10 +460,10 @@
 
 
 
-(define plf-full1 `(,@(build-list 10 (λ (x) (make-block (make-posn x 0) 'gray)))
-                 ,(make-block (make-posn 5 1) 'gray)
-                 ,@(build-list 10 (λ (x) (make-block (make-posn x 2) 'gray)))
-                 ,(make-block (make-posn 4 3) 'blue)))
+(define plf-full1 `(,@(build-list 10 (λ (x) (make-block (make-posn x 0) 'ghost)))
+                 ,(make-block (make-posn 5 1) 'ghost)
+                 ,@(build-list 10 (λ (x) (make-block (make-posn x 2) 'ghost)))
+                 ,(make-block (make-posn 4 3) 'L)))
 
 ; Playfield -> List of Integers
 ; Returns a list of row indeces that represent completed lines
@@ -487,12 +496,12 @@
          ;; Move the block down as many lines as there are completed lines below
          [move-down-fun
           (λ (b) (struct-copy block b
-                                   [posn (make-posn (posn-x (block-posn b))
-                                                    (new-y-fun b))]))])
+                              [posn (make-posn (posn-x (block-posn b))
+                                               (new-y-fun b))]))])
     (map move-down-fun remaining-blocks)))
 ; Test:
-(define plf-cleared1 `(,(make-block (make-posn 5 0) 'gray)
-                       ,(make-block (make-posn 4 1) 'blue)))
+(define plf-cleared1 `(,(make-block (make-posn 5 0) 'ghost)
+                       ,(make-block (make-posn 4 1) 'L)))
 (check-equal? (clear-lines plf-full1) plf-cleared1)
 ; See this diagram for a visual explanation
 (define clear-lines-explanation
@@ -501,17 +510,43 @@
           (draw-tetris plf-cleared1)))
 
 
+; Piece, Playfeld -> GhostY
+(define (piece-ghostY p plf)
+  (posn-y (piece-posn (soft-drop p plf))))
+
+
+; Piece, Playfield -> Playfield
+(define (add-piece-to-playfield p plf)
+  (de-nest (list (piece-blocks p) plf)))
+
+
+; Tetris -> Tetris
+; Lock the piece at its current position and spawn a new one,
+; updating the ghostY at the same time
+(define (tetris-lock-and-spawn t)
+  (let* ([p (tetris-piece t)]
+         [plf (tetris-playfield t)]
+         [plf1 (add-piece-to-playfield p plf)]
+         [plf2 (clear-lines plf1)] 
+         [new-piece (spawn-piece)]
+         [new-ghostY (piece-ghostY new-piece plf2)])
+    (struct-copy tetris t
+                 [playfield plf2]
+                 [piece new-piece]
+                 [ghostY new-ghostY])))
+
+
 ; Tetris -> Tetris
 ; Drop active Piece due to gravity,
 ; or if it landed, lock it, clear the lines, and spawn a new Piece
-(define (drop-piece-or-lock tetris)
-  (let* ([piece (tetris-piece tetris)]
-         [plf (tetris-playfield tetris)]
+(define (try-drop-piece-and-lock t)
+  (let* ([piece (tetris-piece t)]
+         [plf (tetris-playfield t)]
          [new-piece (try-move-piece 'down piece plf)]
          [landed (equal? (piece-posn piece) (piece-posn new-piece))])
     (if landed
-        (make-tetris (spawn-piece) (de-nest (list (piece-blocks piece) plf)))
-        (make-tetris new-piece (tetris-playfield tetris)))))
+        (tetris-lock-and-spawn t)
+        (struct-copy tetris t [piece new-piece]))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -521,16 +556,16 @@
 
 ; _ -> Tetris
 (define (tetris-init)
-  (make-tetris (spawn-piece) '()))
+  (let* ([p (spawn-piece)]
+         [plf '()]
+         [ghostY (piece-ghostY p plf)])
+    (make-tetris p plf ghostY)))
 
 
 ; Tetris -> Tetris
 (define (tetris-on-tick tetris)
-  (let* ([t1 (drop-piece-or-lock tetris)]
-         [b1 (tetris-piece t1)]
-         [plf1 (tetris-playfield t1)]
-         [plf-cleared (clear-lines plf1)])
-    (make-tetris b1 plf-cleared)))
+  (let* ([t1 (try-drop-piece-and-lock tetris)])
+    t1))
 
 
 ; Tetris, Move -> Tetris
@@ -544,5 +579,8 @@
             [(or (eq? mov 'cw) (eq? mov 'ccw)) (try-rotate-piece mov p plf)]
             [(eq? mov 180) (try-rotate-piece-180 p plf)]
             [(eq? mov 'soft-drop) (soft-drop p plf)]
-            [else (error "Invalid argument for move.")])])
-    (struct-copy tetris t [piece new-piece])))
+            [else (error "Invalid argument for move.")])]
+         [new-ghostY (piece-ghostY new-piece plf)])
+    (struct-copy tetris t
+                 [piece new-piece]
+                 [ghostY new-ghostY])))

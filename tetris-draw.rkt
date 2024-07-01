@@ -3,10 +3,21 @@
 (require 2htdp/image)
 (require lang/posn)
 
+(require "utils.rkt")
 (require "tetris-logic.rkt")
 
 (provide draw-tetris)
 
+
+(define h-shape-color
+  (make-immutable-hash '((ghost . gray)
+                         (L . orange)
+                         (J . "Royal Blue")
+                         (Z . red)
+                         (S . green)
+                         (T . "Light Purple")
+                         (O . yellow)
+                         (I . "Medium Cyan"))))
 
 (define BLOCK-SIZE 20) ; blocks are squares
 (define (block-img color)
@@ -25,11 +36,15 @@
 ;; Block, Image -> Image
 ;; Draw a Block onto the playfield image
 (define (draw-block b scene)
-  (underlay/xy scene
-               (* (posn-x (block-posn b)) BLOCK-SIZE)
-               (- PLAYFIELD-HEIGHT
-                  (* (+ (posn-y (block-posn b)) 1) BLOCK-SIZE))
-               (block-img (block-color b))))
+  (let* ([col (hash-ref h-shape-color (block-color b))]
+         [bposn (block-posn b)]
+         [x (posn-x bposn)]
+         [y (posn-y bposn)])
+    (underlay/xy scene
+                 (* x BLOCK-SIZE)
+                 (- PLAYFIELD-HEIGHT
+                    (* (+ y 1) BLOCK-SIZE))
+                 (block-img col))))
 
 
 ; List of Blocks -> Image
@@ -42,4 +57,11 @@
 ; ; Or(Tetris / Piece / Playfield) -> Image
 ; Universal function that draws the given elements on the Playfield
 (define (draw-tetris t)
-  (draw-blocks (tetris-blocks t)))
+  (draw-blocks
+   (cond
+     [(tetris? t) (de-nest (list (tetris-ghost-blocks t)
+                                 (piece-blocks (tetris-piece t))
+                                 (tetris-playfield t)))]
+     [(piece? t) (piece-blocks (tetris-piece t))]
+     [(list? t) t]
+     [else '()])))
