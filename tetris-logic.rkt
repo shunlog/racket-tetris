@@ -200,7 +200,7 @@
 
 
 (define (spawn-piece)
-  (make-piece (make-posn 5 (- HEIGHT 3))
+  (make-piece (make-posn 4 (- HEIGHT 3))
               (random-choice shape-names)
               0))
 
