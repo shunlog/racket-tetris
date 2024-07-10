@@ -7,6 +7,7 @@
 (require racket/lazy-require)
 (require 2htdp/image)
 (require "utils.rkt")
+(require "tetris-shapes-data.rkt")
 (lazy-require ["tetris-draw.rkt"
                (draw-blocks)])
 
@@ -40,7 +41,7 @@
 
 ; A Block is a structure:
 ;   (make-block Posn ColorType)
-; ColorType is one of the shape names, or 'ghost
+; ColorType is a ShapeName or 'ghost
 ;
 ; (make-block (make-posn x y) 'L) depicts a block at position (x, y) in the grid,
 ;     where (0, 0) marks the bottom-left position in the playfield
@@ -57,8 +58,6 @@
 ; A Piece is used to represent the active piece that the players controls
 (define-struct piece [posn shape-name rotation] #:transparent)
 
-; A ShapeName is one of: '(L J S Z O T I)
-(define shape-names '(L J Z S T O I))
 
 ; A Rotation is one of '(0 1 2 3),
 ; representing 0, 90, 180 and 270 clock-wise rotation, respectively
@@ -108,65 +107,6 @@
 (define (tetris-ghost-blocks t)
   (map (lambda (b) (struct-copy block b [color 'ghost]))
        (piece-blocks (tetris-ghost-piece t))))
-
-
-;;;;;;;;;;;;
-;; Shapes ;;
-;;;;;;;;;;;;
-
-; A Shape is a List of Lists of Boolean
-; A Piece occupies those blocks for which the Shape has a value of True
-; The Shape's bottom-left corner coincides with the Piece's position
-
-
-; We pre-compute all the shapes rotations for a slight optimization,
-; and maybe as an exercise
-
-; Hash: ShapeName -> Shape
-(define pieces
-  (make-immutable-hash '((L . ((#f #f #t)
-                               (#t #t #t)
-                               (#f #f #f)))
-                         (J . ((#t #f #f)
-                               (#t #t #t)
-                               (#f #f #f)))
-                         (Z . ((#t #t #f)
-                               (#f #t #t)
-                               (#f #f #f)))
-                         (S . ((#f #t #t)
-                               (#t #t #f)
-                               (#f #f #f)))
-                         (T . ((#f #t #f)
-                               (#t #t #t)
-                               (#f #f #f)))
-                         (O . ((#t #t)
-                               (#t #t)))
-                         (I . ((#f #f #f #f)
-                               (#t #t #t #t)
-                               (#f #f #f #f)
-                               (#f #f #f #f))))))
-
-
-; ShapeName -> '((ShapeName rot-1) Shape-1
-;                (ShapeName rot-2) Shape-2 ...) for every rot in Rotation
-(define (h-piece-rot shape-name)
-  (let* ([shape (hash-ref pieces shape-name)]
-         [shape90 (matrix-rotate-cw shape)]
-         [shape180 (matrix-rotate-cw shape90)]
-         [shape270 (matrix-rotate-cw shape180)])
-    `(((,shape-name 0) . ,shape)
-      ((,shape-name 1) . ,shape90)
-      ((,shape-name 2) . ,shape180)
-      ((,shape-name 3) . ,shape270))))
-
-
-; Hash: '(ShapeName Rotation) -> Shape
-; This is the final data structure to hold the piece shapes for every rotation
-(define h-pieces-rot
-  (make-immutable-hash
-   (de-nest
-    (map (λ (piece-name) (h-piece-rot piece-name))
-         shape-names))))
 
 
 ;;;;;;;;;;;;
@@ -221,7 +161,7 @@
 ; Matrix of Booleans -> List of Pairs of Integer
 ; The pairs represent the offset coordinates to apply to the Piece position
 ; with the origin at the bottom-left of the Shape
-(define (shape-to-coords m)
+(define (shape-to-pos-offsets m)
   (let* ([len (length m)]
          [block-at?
           (λ (posn)
@@ -232,7 +172,7 @@
     (filter block-at? (cartesian-product (build-list len identity)
                                          (build-list len identity)))))
 (check-equal?  (andmap (λ (p) (member? p '((0 1) (1 1) (2 1) (2 2))))
-                       (shape-to-coords (hash-ref pieces 'L)))
+                       (shape-to-pos-offsets (hash-ref h-shapes-rot '(L 0))))
                #t)
 
 
@@ -240,10 +180,10 @@
 ; Returns a list of blocks that the piece consists of
 (define (piece-blocks piece)
   (let* ([sh-name (piece-shape-name piece)]
-         [sh (hash-ref h-pieces-rot
+         [sh (hash-ref h-shapes-rot
                        `(,sh-name
                          ,(piece-rotation piece)))]
-         [coords (shape-to-coords sh)])
+         [coords (shape-to-pos-offsets sh)])
     (map (λ (coord)
            (make-block
             (make-posn (+ (first coord) (posn-x (piece-posn piece)))
@@ -398,49 +338,6 @@
          [new-piece (piece-move piece dirn)]
          [overlapping (piece-overlapping? new-piece plf)])
     (if overlapping piece new-piece)))
-
-
-; A KickDataTable is a Hash:
-; (Rotation . Rotation) -> List of (Pair of Integer)
-; Interpretation:
-;     map the (initial rotation, final rotation) pair
-;     to the list of "kicks" to try when rotating a shape.
-; For details, see: https://tetris.wiki/Super_Rotation_System
-
-
-; J, L, S, T, Z Tetromino KickDataTable
-(define h-kick-data-1
-  (make-immutable-hash
-   '(((0 . 1) . (( 0  0) (-1  0) (-1 +1) ( 0 -2) (-1 -2)))
-     ((1 . 0) . (( 0  0) (+1  0) (+1 -1) ( 0 +2) (+1 +2)))
-     ((1 . 2) . (( 0  0) (+1  0) (+1 -1) ( 0 +2) (+1 +2)))
-     ((2 . 1) . (( 0  0) (-1  0) (-1 +1) ( 0 -2) (-1 -2)))
-     ((2 . 3) . (( 0  0) (+1  0) (+1 +1) ( 0 -2) (+1 -2)))
-     ((3 . 2) . (( 0  0) (-1  0) (-1 -1) ( 0 +2) (-1 +2)))
-     ((3 . 0) . (( 0  0) (-1  0) (-1 -1) ( 0 +2) (-1 +2)))
-     ((0 . 3) . (( 0  0) (+1  0) (+1 +1) ( 0 -2) (+1 -2))))))
-
-; I Tetromino KickDataTable
-(define h-kick-data-2
-  (make-immutable-hash
-   '(((0 . 1) . (( 0  0) (-2  0) (+1  0) (-2 -1) (+1 +2)))
-     ((1 . 0) . (( 0  0) (+2  0) (-1  0) (+2 +1) (-1 -2)))
-     ((1 . 2) . (( 0  0) (-1  0) (+2  0) (-1 +2) (+2 -1)))
-     ((2 . 1) . (( 0  0) (+1  0) (-2  0) (+1 -2) (-2 +1)))
-     ((2 . 3) . (( 0  0) (+2  0) (-1  0) (+2 +1) (-1 -2)))
-     ((3 . 2) . (( 0  0) (-2  0) (+1  0) (-2 -1) (+1 +2)))
-     ((3 . 0) . (( 0  0) (+1  0) (-2  0) (+1 -2) (-2 +1)))
-     ((0 . 3) . (( 0  0) (-1  0) (+2  0) (-1 +2) (+2 -1))))))
-
-; ShapeName -> KickDataTable
-(define h-shape-name-to-kick-data
-  (make-immutable-hash  `([I . ,h-kick-data-2]
-                          [L . ,h-kick-data-1]
-                          [J . ,h-kick-data-1]
-                          [S . ,h-kick-data-1]
-                          [Z . ,h-kick-data-1]
-                          [O . ,h-kick-data-1]
-                          [T . ,h-kick-data-1])))
 
 
 ; RotateDirection, Piece, Playfield -> Piece
