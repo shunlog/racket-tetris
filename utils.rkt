@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require rackunit)
+(require racket/function)
 
 (provide
  member?
@@ -8,7 +9,8 @@
  random-choice
  de-nest
  matrix-rotate-cw
- count-less)
+ count-less
+ all-pairs-of-2-ranges)
 
 
 ; Number, List of Numbers -> Integer
@@ -56,3 +58,17 @@
 ; Rotate matrix 90 degrees
 (define (matrix-rotate-cw ll)
   (map reverse (matrix-transpose ll)))
+
+
+; Number, Number -> List of Pairs
+; Return all pairs of items (i, j)
+; such that i is taken from the range [0..N)
+; and j is taken from the range [0..M)
+(define (all-pairs-of-2-ranges N M)
+  (de-nest
+   (map (λ (y) (map list
+                         (build-list N identity)
+                         (build-list N (λ (_) y))))
+        (build-list M identity))))
+(check-equal? (all-pairs-of-2-ranges 2 4)
+              '((0 0) (1 0) (0 1) (1 1) (0 2) (1 2) (0 3) (1 3)))

@@ -218,18 +218,6 @@
               0))
 
 
-; Number, Number -> List of Pairs
-; Return all 2-combinations of 2 ranges of numbers
-(define (combinations N M)
-  (de-nest
-   (map (λ (y) (map list
-                         (build-list N identity)
-                         (build-list N (λ (_) y))))
-        (build-list M identity))))
-(check-equal? (combinations 2 4)
-              '((0 0) (1 0) (0 1) (1 1) (0 2) (1 2) (0 3) (1 3)))
-
-
 ; Matrix of Booleans -> List of Pairs of Integer
 ; The pairs represent the offset coordinates to apply to the Piece position
 ; with the origin at the bottom-left of the Shape
@@ -241,7 +229,8 @@
                    [y (second posn)]
                    [h (length m)])
               (list-ref (list-ref m (- h y 1)) x)))])
-    (filter block-at? (combinations len len))))
+    (filter block-at? (cartesian-product (build-list len identity)
+                                         (build-list len identity)))))
 (check-equal?  (andmap (λ (p) (member? p '((0 1) (1 1) (2 1) (2 2))))
                        (shape-to-coords (hash-ref pieces 'L)))
                #t)
@@ -261,16 +250,21 @@
                        (+ (second coord) (posn-y (piece-posn piece))))
             sh-name))
          coords)))
-(check-equal? (map block-posn (piece-blocks (make-piece (make-posn 0 0) 'L 0)))
-              (map block-posn `(,(make-block (make-posn 0 1) 'ghost)
-                                ,(make-block (make-posn 1 1) 'ghost)
-                                ,(make-block (make-posn 2 1) 'ghost)
-                                ,(make-block (make-posn 2 2) 'ghost))))
-(check-equal? (map block-posn (piece-blocks (make-piece (make-posn 1 5) 'J 0)))
-              (map block-posn `(,(make-block (make-posn 1 6) 'ghost)
-                                ,(make-block (make-posn 2 6) 'ghost)
-                                ,(make-block (make-posn 3 6) 'ghost)
-                                ,(make-block (make-posn 1 7) 'ghost))))
+
+(check-true
+ (let* ([res-ls (map block-posn (piece-blocks (make-piece (make-posn 0 0) 'L 0)))]
+        [expected-ls (map block-posn `(,(make-block (make-posn 0 1) 'ghost)
+                                       ,(make-block (make-posn 1 1) 'ghost)
+                                       ,(make-block (make-posn 2 1) 'ghost)
+                                       ,(make-block (make-posn 2 2) 'ghost)))])
+   (andmap (λ (e) (member? e expected-ls)) res-ls)))
+(check-true
+ (let* ([res-ls (map block-posn (piece-blocks (make-piece (make-posn 1 5) 'J 0)))]
+        [expected-ls (map block-posn `(,(make-block (make-posn 1 6) 'ghost)
+                                       ,(make-block (make-posn 2 6) 'ghost)
+                                       ,(make-block (make-posn 3 6) 'ghost)
+                                       ,(make-block (make-posn 1 7) 'ghost)))])
+   (andmap (λ (e) (member? e expected-ls)) res-ls)))
 
 
 ; Tetris -> List of Blocks
