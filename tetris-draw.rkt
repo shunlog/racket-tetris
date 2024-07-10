@@ -2,11 +2,10 @@
 
 (require 2htdp/image)
 (require lang/posn)
-
 (require "utils.rkt")
 (require "tetris-logic.rkt")
 
-(provide draw-tetris)
+(provide draw-blocks)
 
 
 (define h-shape-color
@@ -52,16 +51,3 @@
 (define (draw-blocks blocks)
   (foldl draw-block EMPTY-PLAYFIELD
          blocks))
-
-
-; ; Or(Tetris / Piece / Playfield) -> Image
-; Universal function that draws the given elements on the Playfield
-(define (draw-tetris t)
-  (draw-blocks
-   (cond
-     [(tetris? t) (de-nest (list (tetris-ghost-blocks t)
-                                 (piece-blocks (tetris-piece t))
-                                 (tetris-playfield t)))]
-     [(piece? t) (piece-blocks (tetris-piece t))]
-     [(list? t) t]
-     [else '()])))

@@ -21,5 +21,6 @@
 (define (main tick-durn)
   (big-bang (tetris-init)
             [on-tick tetris-on-tick tick-durn]
-            [to-draw draw-tetris]
-            [on-key tetris-on-key]))
+            [to-draw draw-any-blocks]
+            [on-key tetris-on-key]
+            [on-release (lambda (t ev) (begin (writeln ev) t))]))

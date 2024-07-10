@@ -6,9 +6,9 @@
 (require rackunit)
 (require racket/lazy-require)
 (require 2htdp/image)
-
-(lazy-require ["tetris-draw.rkt" (draw-tetris)])
 (require "utils.rkt")
+(lazy-require ["tetris-draw.rkt"
+               (draw-blocks)])
 
 (provide
  WIDTH HEIGHT
@@ -19,7 +19,8 @@
  tetris-move
  tetris-on-tick
  piece-blocks
- tetris-ghost-blocks)
+ tetris-ghost-blocks
+ draw-any-blocks)
 
 
 ;; Grid size
@@ -174,28 +175,40 @@
 
 
 ; A Tetris is a structure:
-;   (make-tetris Piece Playfield GhostY)
-; A Playfield is a list of Blocks
-; GhostY is an Integer
+;   (make-tetris Piece Playfield GhostY KeysState)
+; Interpretation:
+;     Piece represents the active piece
+;     Playfield represents the resting blocks
+;     GhostY is the height at which to draw the ghost of the active piece
+;     KeysState keeps track whether "down", "left" and "right" are pressed
 ;
-; (make-tetris p0 (list b1 b2 ...) Y)
-;     p0 is the active Piece,
-;     b1, b2, and ... are the resting Blocks,
-;     Y is the height at which to draw the ghost of the active piece
+; A Playfield is a list of Blocks.
 ;
+; GhostY is an Integer.
 ; Keeping GhostY in the state is necessary for optimal drawing the ghost piece,
 ; otherwise we'd have to compute it on every tick, which is a bit wasteful.
 ; However, it also means we must be careful to always update GhostY
-; whenever we move or rotate the piece, except when we drop it down
+; whenever we move or rotate the piece, except when we drop it down.
 
-(define-struct tetris (piece playfield ghostY)
+(define-struct tetris
+  (piece playfield ghostY keys-state)
+  #:transparent)
+
+
+; KeysState is a structure that keeps track of the states of a few keys.
+; We need this structure to access this information inside `on-tick`
+; which is necessary to implement the authoshift feature
+(define-struct keys-state
+  (right left down)
   #:transparent)
 
 
 ;; Examples:
 (define playfield0 `())
 (define piece0 (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0))
-(define tetris0 (make-tetris piece0 playfield0 -1))
+(define tetris0
+  (make-tetris piece0 playfield0 -1
+               (make-keys-state #f #f #f)))
 (define playfield1 `(,(make-block (make-posn 0 0) 'ghost)))
 
 
@@ -258,6 +271,52 @@
                                 ,(make-block (make-posn 2 6) 'ghost)
                                 ,(make-block (make-posn 3 6) 'ghost)
                                 ,(make-block (make-posn 1 7) 'ghost))))
+
+
+; Tetris -> List of Blocks
+; It's convenient to treat a Tetris as just a list of blocks for drawing it
+(define (tetris-blocks t)
+  `(,@(tetris-ghost-blocks t)
+    ,@(piece-blocks (tetris-piece t))
+    ,@(tetris-playfield t)))
+
+
+; Any -> Boolean
+(define (playfield? plf)
+  (if (list? plf)
+      (andmap (λ (el) (block? el)) plf)
+      #f))
+
+
+; Playfield -> List of Blocks
+; Just in case the representation changes
+(define (playfield-blocks plf)
+  plf)
+
+
+; [Playfield / Piece / Tetris] -> List of Blocks
+; Convert anything to blocks, or return an error
+(define (any-to-blocks e)
+  (cond
+    [(block? e) e]
+    [(playfield? e) (playfield-blocks e)]
+    [(piece? e) (piece-blocks e)]
+    [(tetris? e) (tetris-blocks e)]
+    [else (error "Argument can't be converted to blocks.")]))
+
+
+; List of [Block / Piece / Tetris] or just any of these -> List of Blocks
+(define (convert-to-blocks ls)
+  (flatten
+   (if (list? ls)
+       (map (λ (e) (any-to-blocks e)) ls)
+       (any-to-blocks ls))))
+
+
+; List of [Piece / Block / Tetris] -> Image
+; Draw a list of anything that can be converted to blocks
+(define (draw-any-blocks ls)
+  (draw-blocks (convert-to-blocks ls)))
 
 
 ; Block Playfield -> Boolean
@@ -431,8 +490,8 @@
             (make-block (make-posn 0 2) 'ghost)
             (make-block (make-posn 2 4) 'ghost))]
 (define rotate-test
-  (beside (draw-tetris (make-tetris p2 plf2 0))
-          (draw-tetris (make-tetris p3 plf2 0))))
+  (beside (draw-any-blocks (make-tetris p2 plf2 0 (make-keys-state #f #f #f)))
+          (draw-any-blocks (make-tetris p3 plf2 0 (make-keys-state #f #f #f)))))
 (check-equal? (try-rotate-piece 'cw p2 plf2) p3)
 
 
@@ -505,9 +564,9 @@
 (check-equal? (clear-lines plf-full1) plf-cleared1)
 ; See this diagram for a visual explanation
 (define clear-lines-explanation
-  (beside (draw-tetris plf-full1)
+  (beside (draw-any-blocks plf-full1)
           (text " Clear lines -> " 25 'black)
-          (draw-tetris plf-cleared1)))
+          (draw-any-blocks plf-cleared1)))
 
 
 ; Piece, Playfeld -> GhostY
@@ -559,7 +618,10 @@
   (let* ([p (spawn-piece)]
          [plf '()]
          [ghostY (piece-ghostY p plf)])
-    (make-tetris p plf ghostY)))
+    (struct-copy tetris tetris0
+                 [piece p]
+                 [playfield plf]
+                 [ghostY ghostY])))
 
 
 ; Tetris -> Tetris
