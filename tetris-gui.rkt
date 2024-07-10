@@ -2,8 +2,9 @@
 
 (require "tetris-logic.rkt")
 (require "tetris-draw.rkt")
-
 (require 2htdp/universe)
+
+(provide main)
 
 ; Tetris, Key -> Tetris
 (define (tetris-on-key t k)
