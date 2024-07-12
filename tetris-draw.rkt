@@ -3,7 +3,7 @@
 (require 2htdp/image)
 (require lang/posn)
 (require "utils.rkt")
-(require "tetris-logic.rkt")
+(require "tetris.rkt")
 
 (provide draw-blocks)
 

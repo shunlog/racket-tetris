@@ -6,6 +6,7 @@
 (require rackunit)
 (require racket/lazy-require)
 (require 2htdp/image)
+(require 2htdp/universe)
 (require "utils.rkt")
 (require "tetris-shapes-data.rkt")
 (lazy-require ["tetris-draw.rkt"
@@ -28,10 +29,15 @@
 (define WIDTH 10)
 (define HEIGHT 20)
 
+(define T-DELAY-AUTOSHIFT 200)          ; ms to start autoshifting
+(define T-AUTOSHIFT-RATE 35)            ; ms between autoshifts
+(define T-DROP-RATE 500)
 
-;;;;;;;;;;;;
-;; Blocks ;;
-;;;;;;;;;;;;
+(define time-ms current-inexact-monotonic-milliseconds)
+
+;;;;;;;;;;;;;;;;;
+;; Definitions ;;
+;;;;;;;;;;;;;;;;;
 
 ; As a convention, the coordinates space will be the same as in math:
 ; x increases to the right
@@ -48,20 +54,66 @@
 ;     and that should be colored like the L shape
 (define-struct block [posn color] #:transparent)
 
-
-; A Piece is a structure:
-;   (make-piece Posn ShapeName Rotation)
-;
-;(make-piece (make-posn x y) 'L 3)
-;    Represents an L piece whose Shape's bottom-left corner is at coordinates (x, y)
-;    and that is rotated 270 degrees.
-; A Piece is used to represent the active piece that the players controls
-(define-struct piece [posn shape-name rotation] #:transparent)
-
-
 ; A Rotation is one of '(0 1 2 3),
 ; representing 0, 90, 180 and 270 clock-wise rotation, respectively
 
+
+(define-struct tetris
+  (piece
+   playfield   
+   ghostY
+   h-key-state
+   last-dirn-right?
+   t-dirn-start
+   t-last-autoshift
+   t-last-drop)
+  #:transparent)
+
+; A Tetris is a structure:
+;     KeysState keeps track whether "down", "left" and "right" are pressed
+
+; * Playfield is a list of Blocks representing the resting blocks.
+
+; * A Piece is a structure used to represent the active piece that the players controls
+;   (make-piece Posn ShapeName Rotation)
+;   E.g. (make-piece (make-posn x y) 'L 3)
+;   Represents an L piece whose Shape's bottom-left corner is at coordinates (x, y)
+;   and that is rotated 270 degrees.
+(define-struct piece [posn shape-name rotation] #:transparent)
+
+; * GhostY is an Integer
+; representing the height at which to draw the ghost of the active piece.
+; Keeping GhostY in the state is necessary for optimal drawing the ghost piece,
+; otherwise we'd have to compute it on every tick, which is a bit wasteful.
+; However, it also means we must be careful to always update GhostY
+; whenever we move or rotate the piece, except when we drop it down.
+
+; * KeysState is a hash that keeps track of the states of a few keys.
+; The hash keys are key names, and the value is either #t or #f.
+; If a key is not in the hash, it should be considered #f.
+
+; * last-dirn-right? is a Boolean.
+; if it's True, it means the last pressed direction was "right",
+; otherwise the last one was "left".
+; This is needed to make autoshift work properly when both keys are pressed.
+
+; * t-dirn-start is the time in milliseconds when the side movement started,
+; meaning when a direction key was pressed after both were released.
+; As long as at least one direction key is held, this timer is not reset.
+;
+; If long enough time has passed, and the direction key is still held,
+; then we  the autoshift.
+
+; * t-last-autoshift is the time in ms when autoshift was last done.
+; this is needed to know when to autoshift the key on a tick
+
+; * t-last-drop is the time in ms when the piece was last dropped,
+; including soft drop and fast drop
+
+
+;;;;;;;;;;;;;;;
+;; Functions ;;
+;;;;;;;;;;;;;;;
 
 ; Rotation, Or[RotateDirection / Rotation] -> Rotation
 (define (rotation+ rot0 dirn)
@@ -109,38 +161,57 @@
        (piece-blocks (tetris-ghost-piece t))))
 
 
-;;;;;;;;;;;;
-;; Tetris ;;
-;;;;;;;;;;;;
+; Tetris, Key -> Boolean
+(define (tetris-key-down? t k)
+  (hash-ref (tetris-h-key-state t) k #f))
 
 
-; A Tetris is a structure:
-;   (make-tetris Piece Playfield GhostY KeysState)
-; Interpretation:
-;     Piece represents the active piece
-;     Playfield represents the resting blocks
-;     GhostY is the height at which to draw the ghost of the active piece
-;     KeysState keeps track whether "down", "left" and "right" are pressed
-;
-; A Playfield is a list of Blocks.
-;
-; GhostY is an Integer.
-; Keeping GhostY in the state is necessary for optimal drawing the ghost piece,
-; otherwise we'd have to compute it on every tick, which is a bit wasteful.
-; However, it also means we must be careful to always update GhostY
-; whenever we move or rotate the piece, except when we drop it down.
-
-(define-struct tetris
-  (piece playfield ghostY keys-state)
-  #:transparent)
+; Tetris, Key -> Boolean
+; Return whether any of the "right" or "left" keys are pressed.
+(define (tetris-moving? t)
+  (or (tetris-key-down? t "left")
+      (tetris-key-down? t "right")))
 
 
-; KeysState is a structure that keeps track of the states of a few keys.
-; We need this structure to access this information inside `on-tick`
-; which is necessary to implement the authoshift feature
-(define-struct keys-state
-  (right left down)
-  #:transparent)
+; Tetris 
+(define (tetris-dirn-key-just-pressed t right?)
+  (let* ([new-t-dirn-start
+          (if (not (tetris-moving? t))
+              (time-ms)
+              (tetris-t-dirn-start t))]
+         [new-last-dirn-right? right?]
+         [t2 (tetris-move t (if right? 'right 'left))])
+    (struct-copy tetris t2
+                 [last-dirn-right? new-last-dirn-right?]
+                 [t-dirn-start new-t-dirn-start])))
+
+
+; Tetris, Key -> Tetris
+; Handle a key that was just pressed
+; (meaning the autofire is filtered already)
+(define (tetris-key-just-pressed t k)
+  (cond
+    [(or (key=? "left" k) (key=? "right" k))
+     (tetris-dirn-key-just-pressed t
+                                   (key=? "right" k))]
+    [else t]))
+
+
+; Tetris, Key, Boolean -> Tetris
+; Set whether a key is pressed or released
+(define (tetris-handle-key t k pressed)
+  (let* ([old-pressed
+          (hash-ref (tetris-h-key-state t) k #f)])
+    (if (equal? pressed old-pressed)
+        t
+        (let* ([new-h-key-state
+                (hash-set (tetris-h-key-state t) k pressed)]
+               [t1 (if pressed
+                       (tetris-key-just-pressed t k)
+                       t)]
+               [t2 (struct-copy tetris t1
+                                [h-key-state new-h-key-state])])
+          t2))))
 
 
 ;; Examples:
@@ -148,7 +219,8 @@
 (define piece0 (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0))
 (define tetris0
   (make-tetris piece0 playfield0 -1
-               (make-keys-state #f #f #f)))
+               (make-immutable-hash)
+               #t 0 0 0))
 (define playfield1 `(,(make-block (make-posn 0 0) 'ghost)))
 
 
@@ -381,8 +453,8 @@
             (make-block (make-posn 0 2) 'ghost)
             (make-block (make-posn 2 4) 'ghost))]
 (define rotate-test
-  (beside (draw-any-blocks (make-tetris p2 plf2 0 (make-keys-state #f #f #f)))
-          (draw-any-blocks (make-tetris p3 plf2 0 (make-keys-state #f #f #f)))))
+  (beside (draw-any-blocks (struct-copy tetris tetris0 [piece p2] [playfield plf2]))
+          (draw-any-blocks (struct-copy tetris tetris0 [piece p3] [playfield plf2]))))
 (check-equal? (try-rotate-piece 'cw p2 plf2) p3)
 
 
@@ -499,6 +571,63 @@
         (struct-copy tetris t [piece new-piece]))))
 
 
+; Tetris -> Tetris
+; after a tick, check if it's time to drop the piece 
+(define (tetris-tick-drop t)
+  (let* ([t-curr (time-ms)]
+         [t-last-drop (tetris-t-last-drop t)]
+         )
+    (if (< (- t-curr t-last-drop)
+           T-DROP-RATE)
+        t
+        (let* ([new-t-last-drop
+                (+ t-last-drop
+                   T-DROP-RATE)]
+               [t1 (try-drop-piece-and-lock t)]
+               [t2 (struct-copy tetris t1
+                                [t-last-drop new-t-last-drop])])
+          t2))))
+
+
+; Tetris -> Tetris
+; Autoshift and update the timer
+(define (tetris-autoshift t)
+  (let* ([t-dirn-start (tetris-t-dirn-start t)]
+         [t-last-autoshift (tetris-t-last-autoshift t)]
+         [new-t-last-autoshift
+          (if (< t-last-autoshift t-dirn-start)  ; autoshift just started
+              (+ t-dirn-start T-DELAY-AUTOSHIFT)
+              (+ t-last-autoshift T-AUTOSHIFT-RATE))]
+         [t1 (struct-copy tetris t
+                          [t-last-autoshift new-t-last-autoshift])])
+    (cond
+      [(and (tetris-key-down? t "left")
+            (or (not (tetris-last-dirn-right? t))
+                (not (tetris-key-down? t "right"))))
+       (tetris-move t1 'left)]
+      [(and (tetris-key-down? t "right")
+            (or (tetris-last-dirn-right? t)
+                (not (tetris-key-down? t "left"))))
+       (tetris-move t1 'right)]
+      [else t1])))
+
+
+; Tetris -> Tetris
+; Start autoshifting if enough time has passed
+; since the last direction key press
+; and since the last autoshift
+(define (tetris-tick-autoshift t)
+  (let* ([t-curr (time-ms)]
+         [t-dirn-start (tetris-t-dirn-start t)]
+         [t-last-autoshift (tetris-t-last-autoshift t)])
+    (if (or (< (- t-curr t-dirn-start)
+                T-DELAY-AUTOSHIFT)
+            (< (- t-curr t-last-autoshift)
+            T-AUTOSHIFT-RATE))
+        t
+        (tetris-autoshift t))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Exported functions ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -512,13 +641,17 @@
     (struct-copy tetris tetris0
                  [piece p]
                  [playfield plf]
-                 [ghostY ghostY])))
+                 [ghostY ghostY]
+                 [t-dirn-start (time-ms)]
+                 [t-last-autoshift (time-ms)]
+                 [t-last-drop (time-ms)])))
 
 
 ; Tetris -> Tetris
 (define (tetris-on-tick tetris)
-  (let* ([t1 (try-drop-piece-and-lock tetris)])
-    t1))
+  (let* ([t1 (tetris-tick-drop tetris)]
+         [t2 (tetris-tick-autoshift t1)])
+    t2))
 
 
 ; Tetris, Move -> Tetris
@@ -537,3 +670,30 @@
     (struct-copy tetris t
                  [piece new-piece]
                  [ghostY new-ghostY])))
+
+
+; Tetris, Key -> Tetris
+(define (tetris-on-key t0 k)
+  (let* ([t (tetris-handle-key t0 k #t)])
+    (cond
+      ;; [(key=? k "left") (tetris-move t 'left)]
+      ;; [(key=? k "right") (tetris-move t 'right)]
+      [(key=? k " ") (tetris-move t 'soft-drop)]
+      [(or (key=? k "up") (key=? k "x")) (tetris-move t 'cw)]
+      [(key=? k "z") (tetris-move t 'ccw)]
+      [(key=? k "a") (tetris-move t 180)]
+      [else t])))
+
+
+; Tetris, Key -> Tetris
+(define (tetris-on-release t0 k)
+  (tetris-handle-key t0 k #f))
+
+
+
+(define (main tick-durn)
+  (big-bang (tetris-init)
+            [on-tick tetris-on-tick tick-durn]
+            [to-draw draw-any-blocks]
+            [on-key tetris-on-key]
+            [on-release tetris-on-release]))
