@@ -5,7 +5,7 @@
 (provide
  shape-names
  h-shapes-rot
- h-shape-name-to-kick-data)
+ h-kick-data)
 
 ; A Shape is a square matrix (List of Lists) of Boolean values
 
@@ -108,7 +108,7 @@
      ((0 . 3) . (( 0  0) (-1  0) (+2  0) (-1 +2) (+2 -1))))))
 
 ; ShapeName -> KickDataTable
-(define h-shape-name-to-kick-data
+(define h-kick-data
   (make-immutable-hash  `([I . ,h-kick-data-2]
                           [L . ,h-kick-data-1]
                           [J . ,h-kick-data-1]

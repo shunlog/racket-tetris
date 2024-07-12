@@ -348,7 +348,7 @@
   (let* ([shape-name (piece-shape-name piece0)]
          [rot0 (piece-rotation piece0)]
          [new-rot (rotation+ rot0 dirn)]
-         [kick-table (hash-ref h-shape-name-to-kick-data shape-name)]
+         [kick-table (hash-ref h-kick-data shape-name)]
          [kick-list (hash-ref kick-table `(,rot0 . ,new-rot))]
          [try-kick  ; return #t if this kick doesn't fail, else #f
           (λ (k)
