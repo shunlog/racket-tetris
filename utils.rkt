@@ -10,8 +10,11 @@
  de-nest
  matrix-rotate-cw
  count-less
- all-pairs-of-2-ranges)
+ all-pairs-of-2-ranges
+ time-ms
+ )
 
+(define time-ms current-inexact-monotonic-milliseconds)
 
 ; Number, List of Numbers -> Integer
 ; Count how many numbers in the list are smaller than the given number n

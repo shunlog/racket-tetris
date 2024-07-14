@@ -7,6 +7,7 @@
 (require racket/lazy-require)
 (require 2htdp/image)
 (require 2htdp/universe)
+
 (require "utils.rkt")
 (require "tetris-shapes-data.rkt")
 (lazy-require ["tetris-draw.rkt"
@@ -18,11 +19,16 @@
  (struct-out block)
  (struct-out piece)
  tetris-init
- tetris-move
+ tetris-on-key
+ tetris-on-release
  tetris-on-tick
- piece-blocks
  tetris-ghost-blocks
  draw-any-blocks)
+
+
+;;;;;;;;;;;;;;;;;;;
+;; Configuration ;;
+;;;;;;;;;;;;;;;;;;;
 
 
 ;; Grid size
@@ -33,11 +39,61 @@
 (define T-AUTOSHIFT-RATE 35)            ; ms between autoshifts
 (define T-DROP-RATE 500)
 
-(define time-ms current-inexact-monotonic-milliseconds)
+
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; Exported functions ;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; _ -> Tetris
+(define (tetris-init)
+  (let* ([p (spawn-piece)]
+         [plf '()]
+         [ghostY (piece-ghostY p plf)])
+    (struct-copy tetris tetris0
+                 [piece p]
+                 [playfield plf]
+                 [ghostY ghostY]
+                 [t-start-dirn (time-ms)]
+                 [t-last-autoshift (time-ms)]
+                 [t-last-drop (time-ms)])))
+
+
+; Tetris -> Tetris
+(define (tetris-on-tick tetris)
+  (let* ([t1 (tetris-tick-drop tetris)]
+         [t2 (tetris-tick-autoshift t1)])
+    t2))
+
+
+; Tetris, Key -> Tetris
+(define (tetris-on-release t0 k)
+  (tetris-update-key-state t0 k #f))
+
+
+; Tetris, Key -> Tetris
+(define (tetris-on-key t k ms)
+  (if (tetris-key-pressed? t k)
+      t
+      (tetris-key-just-pressed
+       (tetris-update-key-state
+        (tetris-update-last-dirn 
+         (tetris-update-t-start-dirn t k ms)
+         k)
+        k #t) k ms)))
+
+
+; List of [Piece / Block / Tetris] -> Image
+; Draw a list of anything that can be converted to blocks
+(define (draw-any-blocks ls)
+  (draw-blocks (convert-to-blocks ls)))
+
+
 
 ;;;;;;;;;;;;;;;;;
 ;; Definitions ;;
 ;;;;;;;;;;;;;;;;;
+
 
 ; As a convention, the coordinates space will be the same as in math:
 ; x increases to the right
@@ -57,14 +113,13 @@
 ; A Rotation is one of '(0 1 2 3),
 ; representing 0, 90, 180 and 270 clock-wise rotation, respectively
 
-
 (define-struct tetris
   (piece
    playfield   
    ghostY
    h-key-state
    last-dirn-right?
-   t-dirn-start
+   t-start-dirn
    t-last-autoshift
    t-last-drop)
   #:transparent)
@@ -97,7 +152,7 @@
 ; otherwise the last one was "left".
 ; This is needed to make autoshift work properly when both keys are pressed.
 
-; * t-dirn-start is the time in milliseconds when the side movement started,
+; * t-start-dirn is the time in milliseconds when the side movement started,
 ; meaning when a direction key was pressed after both were released.
 ; As long as at least one direction key is held, this timer is not reset.
 ;
@@ -161,57 +216,54 @@
        (piece-blocks (tetris-ghost-piece t))))
 
 
-; Tetris, Key -> Boolean
-(define (tetris-key-down? t k)
+; Tetris, Key -> Tetris
+; Call each time a direction key has been just pressed,
+; update the t-start-dirn state variable
+(define (tetris-update-t-start-dirn t k ms)
+  (if (not (or (key=? k "right")
+               (key=? k "left")))
+      t
+      (let* ([dirn-pressed (or (tetris-key-pressed? t "left")
+                               (tetris-key-pressed? t "right"))])
+        (if dirn-pressed
+            t
+            (struct-copy tetris t [t-start-dirn ms])))))
+
+
+; Tetris Key -> Tetris
+; Update the last-direction-right? state variable
+(define (tetris-update-last-dirn t k)
+  (if (not (or (key=? k "right")
+               (key=? k "left")))
+      t
+      (struct-copy tetris t
+                   [last-dirn-right? (key=? k "right")])))
+
+
+; Tetris Key -> Boolean
+(define (tetris-key-pressed? t k)
   (hash-ref (tetris-h-key-state t) k #f))
 
 
-; Tetris, Key -> Boolean
-; Return whether any of the "right" or "left" keys are pressed.
-(define (tetris-moving? t)
-  (or (tetris-key-down? t "left")
-      (tetris-key-down? t "right")))
-
-
-; Tetris 
-(define (tetris-dirn-key-just-pressed t right?)
-  (let* ([new-t-dirn-start
-          (if (not (tetris-moving? t))
-              (time-ms)
-              (tetris-t-dirn-start t))]
-         [new-last-dirn-right? right?]
-         [t2 (tetris-move t (if right? 'right 'left))])
-    (struct-copy tetris t2
-                 [last-dirn-right? new-last-dirn-right?]
-                 [t-dirn-start new-t-dirn-start])))
-
-
-; Tetris, Key -> Tetris
-; Handle a key that was just pressed
-; (meaning the autofire is filtered already)
-(define (tetris-key-just-pressed t k)
+; Tetris Key -> Tetris
+; called when a key is just pressed
+(define (tetris-key-just-pressed t k ms)
   (cond
-    [(or (key=? "left" k) (key=? "right" k))
-     (tetris-dirn-key-just-pressed t
-                                   (key=? "right" k))]
+    [(key=? k "left") (tetris-move t 'left)]
+    [(key=? k "right") (tetris-move t 'right)]
+    [(key=? k " ") (tetris-move t 'soft-drop)]
+    [(or (key=? k "up") (key=? k "x")) (tetris-move t 'cw)]
+    [(key=? k "z") (tetris-move t 'ccw)]
+    [(key=? k "a") (tetris-move t 180)]
     [else t]))
 
 
 ; Tetris, Key, Boolean -> Tetris
 ; Set whether a key is pressed or released
-(define (tetris-handle-key t k pressed)
-  (let* ([old-pressed
-          (hash-ref (tetris-h-key-state t) k #f)])
-    (if (equal? pressed old-pressed)
-        t
-        (let* ([new-h-key-state
-                (hash-set (tetris-h-key-state t) k pressed)]
-               [t1 (if pressed
-                       (tetris-key-just-pressed t k)
-                       t)]
-               [t2 (struct-copy tetris t1
-                                [h-key-state new-h-key-state])])
-          t2))))
+(define (tetris-update-key-state t k pressed)
+  (let* ([h (tetris-h-key-state t)] 
+         [new-h (hash-set h k pressed)])
+    (struct-copy tetris t [h-key-state new-h])))
 
 
 ;; Examples:
@@ -317,12 +369,6 @@
    (if (list? ls)
        (map (λ (e) (any-to-blocks e)) ls)
        (any-to-blocks ls))))
-
-
-; List of [Piece / Block / Tetris] -> Image
-; Draw a list of anything that can be converted to blocks
-(define (draw-any-blocks ls)
-  (draw-blocks (convert-to-blocks ls)))
 
 
 ; Block Playfield -> Boolean
@@ -592,22 +638,22 @@
 ; Tetris -> Tetris
 ; Autoshift and update the timer
 (define (tetris-autoshift t)
-  (let* ([t-dirn-start (tetris-t-dirn-start t)]
+  (let* ([t-start-dirn (tetris-t-start-dirn t)]
          [t-last-autoshift (tetris-t-last-autoshift t)]
          [new-t-last-autoshift
-          (if (< t-last-autoshift t-dirn-start)  ; autoshift just started
-              (+ t-dirn-start T-DELAY-AUTOSHIFT)
+          (if (< t-last-autoshift t-start-dirn)  ; autoshift just started
+              (+ t-start-dirn T-DELAY-AUTOSHIFT)
               (+ t-last-autoshift T-AUTOSHIFT-RATE))]
          [t1 (struct-copy tetris t
                           [t-last-autoshift new-t-last-autoshift])])
     (cond
-      [(and (tetris-key-down? t "left")
+      [(and (tetris-key-pressed? t "left")
             (or (not (tetris-last-dirn-right? t))
-                (not (tetris-key-down? t "right"))))
+                (not (tetris-key-pressed? t "right"))))
        (tetris-move t1 'left)]
-      [(and (tetris-key-down? t "right")
+      [(and (tetris-key-pressed? t "right")
             (or (tetris-last-dirn-right? t)
-                (not (tetris-key-down? t "left"))))
+                (not (tetris-key-pressed? t "left"))))
        (tetris-move t1 'right)]
       [else t1])))
 
@@ -618,40 +664,14 @@
 ; and since the last autoshift
 (define (tetris-tick-autoshift t)
   (let* ([t-curr (time-ms)]
-         [t-dirn-start (tetris-t-dirn-start t)]
+         [t-start-dirn (tetris-t-start-dirn t)]
          [t-last-autoshift (tetris-t-last-autoshift t)])
-    (if (or (< (- t-curr t-dirn-start)
+    (if (or (< (- t-curr t-start-dirn)
                 T-DELAY-AUTOSHIFT)
             (< (- t-curr t-last-autoshift)
             T-AUTOSHIFT-RATE))
         t
         (tetris-autoshift t))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;
-;; Exported functions ;;
-;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-; _ -> Tetris
-(define (tetris-init)
-  (let* ([p (spawn-piece)]
-         [plf '()]
-         [ghostY (piece-ghostY p plf)])
-    (struct-copy tetris tetris0
-                 [piece p]
-                 [playfield plf]
-                 [ghostY ghostY]
-                 [t-dirn-start (time-ms)]
-                 [t-last-autoshift (time-ms)]
-                 [t-last-drop (time-ms)])))
-
-
-; Tetris -> Tetris
-(define (tetris-on-tick tetris)
-  (let* ([t1 (tetris-tick-drop tetris)]
-         [t2 (tetris-tick-autoshift t1)])
-    t2))
 
 
 ; Tetris, Move -> Tetris
@@ -671,29 +691,3 @@
                  [piece new-piece]
                  [ghostY new-ghostY])))
 
-
-; Tetris, Key -> Tetris
-(define (tetris-on-key t0 k)
-  (let* ([t (tetris-handle-key t0 k #t)])
-    (cond
-      ;; [(key=? k "left") (tetris-move t 'left)]
-      ;; [(key=? k "right") (tetris-move t 'right)]
-      [(key=? k " ") (tetris-move t 'soft-drop)]
-      [(or (key=? k "up") (key=? k "x")) (tetris-move t 'cw)]
-      [(key=? k "z") (tetris-move t 'ccw)]
-      [(key=? k "a") (tetris-move t 180)]
-      [else t])))
-
-
-; Tetris, Key -> Tetris
-(define (tetris-on-release t0 k)
-  (tetris-handle-key t0 k #f))
-
-
-
-(define (main tick-durn)
-  (big-bang (tetris-init)
-            [on-tick tetris-on-tick tick-durn]
-            [to-draw draw-any-blocks]
-            [on-key tetris-on-key]
-            [on-release tetris-on-release]))
