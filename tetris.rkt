@@ -7,6 +7,7 @@
 (require racket/lazy-require)
 (require 2htdp/image)
 (require 2htdp/universe)
+(require threading)
 
 (require "utils.rkt")
 (require "tetris-shapes-data.rkt")
@@ -73,21 +74,19 @@
 
 ; Tetris, Key -> Tetris
 (define (tetris-on-key t k ms)
-  (if (tetris-key-pressed? t k)
+  (if (tetris-key-pressed? t k)         ; ignore key auto-repeat
       t
-      (tetris-key-just-pressed
-       (tetris-update-key-state
-        (tetris-update-last-dirn 
-         (tetris-update-t-start-dirn t k ms)
-         k)
-        k #t) k ms)))
+      (~> t
+          (tetris-update-t-start-dirn k ms)
+          (tetris-update-last-dirn k)
+          (tetris-update-key-state k #t)
+          (tetris-key-just-pressed k ms))))
 
 
 ; List of [Piece / Block / Tetris] -> Image
 ; Draw a list of anything that can be converted to blocks
 (define (draw-any-blocks ls)
   (draw-blocks (convert-to-blocks ls)))
-
 
 
 ;;;;;;;;;;;;;;;;;
