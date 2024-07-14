@@ -27,6 +27,7 @@
  draw-any-blocks)
 
 
+
 ;;;;;;;;;;;;;;;;;;;
 ;; Configuration ;;
 ;;;;;;;;;;;;;;;;;;;
@@ -47,28 +48,28 @@
 
 
 ; _ -> Tetris
-(define (tetris-init)
-  (let* ([p (spawn-piece)]
-         [plf '()]
-         [ghostY (piece-ghostY p plf)])
-    (struct-copy tetris tetris0
-                 [piece p]
-                 [playfield plf]
-                 [ghostY ghostY]
-                 [t-start-dirn (time-ms)]
-                 [t-last-autoshift (time-ms)]
-                 [t-last-drop (time-ms)])))
+(define (tetris-init time)
+  [define p (spawn-piece)]
+  [define plf '()]
+  [define ghostY (piece-ghostY p plf)]
+  (struct-copy tetris tetris0
+               [piece p]
+               [playfield plf]
+               [ghostY ghostY]
+               [t-start-dirn time]
+               [t-last-autoshift time]
+               [t-last-drop time]))
 
 
 ; Tetris -> Tetris
-(define (tetris-on-tick tetris)
-  (let* ([t1 (tetris-tick-drop tetris)]
-         [t2 (tetris-tick-autoshift t1)])
-    t2))
+(define (tetris-on-tick t time)
+  (~> t
+      (tetris-tick-drop time)
+      (tetris-tick-autoshift time)))
 
 
 ; Tetris, Key -> Tetris
-(define (tetris-on-release t0 k)
+(define (tetris-on-release t0 k ms)
   (tetris-update-key-state t0 k #f))
 
 
@@ -618,20 +619,18 @@
 
 ; Tetris -> Tetris
 ; after a tick, check if it's time to drop the piece 
-(define (tetris-tick-drop t)
-  (let* ([t-curr (time-ms)]
-         [t-last-drop (tetris-t-last-drop t)]
-         )
-    (if (< (- t-curr t-last-drop)
-           T-DROP-RATE)
-        t
-        (let* ([new-t-last-drop
-                (+ t-last-drop
-                   T-DROP-RATE)]
-               [t1 (try-drop-piece-and-lock t)]
-               [t2 (struct-copy tetris t1
-                                [t-last-drop new-t-last-drop])])
-          t2))))
+(define (tetris-tick-drop t time)
+  (define t-last-drop (tetris-t-last-drop t))
+  (if (< (- time t-last-drop)
+         T-DROP-RATE)
+      t
+      (let* ([new-t-last-drop
+              (+ t-last-drop
+                 T-DROP-RATE)]
+             [t1 (try-drop-piece-and-lock t)]
+             [t2 (struct-copy tetris t1
+                              [t-last-drop new-t-last-drop])])
+        t2)))
 
 
 ; Tetris -> Tetris
@@ -661,16 +660,15 @@
 ; Start autoshifting if enough time has passed
 ; since the last direction key press
 ; and since the last autoshift
-(define (tetris-tick-autoshift t)
-  (let* ([t-curr (time-ms)]
-         [t-start-dirn (tetris-t-start-dirn t)]
-         [t-last-autoshift (tetris-t-last-autoshift t)])
-    (if (or (< (- t-curr t-start-dirn)
-                T-DELAY-AUTOSHIFT)
-            (< (- t-curr t-last-autoshift)
-            T-AUTOSHIFT-RATE))
-        t
-        (tetris-autoshift t))))
+(define (tetris-tick-autoshift t time)
+  [define t-start-dirn (tetris-t-start-dirn t)]
+  [define t-last-autoshift (tetris-t-last-autoshift t)]
+  (if (or (< (- time t-start-dirn)
+             T-DELAY-AUTOSHIFT)
+          (< (- time t-last-autoshift)
+             T-AUTOSHIFT-RATE))
+      t
+      (tetris-autoshift t)))
 
 
 ; Tetris, Move -> Tetris
@@ -690,3 +688,5 @@
                  [piece new-piece]
                  [ghostY new-ghostY])))
 
+;; (require racket/trace)
+;; (trace draw-any-blocks)
