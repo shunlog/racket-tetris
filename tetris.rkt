@@ -50,12 +50,10 @@
 ; _ -> Tetris
 (define (tetris-init time)
   [define p (spawn-piece)]
-  [define plf '()]
-  [define ghostY (piece-ghostY p plf)]
   (struct-copy tetris tetris0
                [piece p]
-               [playfield plf]
-               [ghostY ghostY]
+               [playfield '()]
+               [ghostY 0]
                [t-start-dirn time]
                [t-last-autoshift time]
                [t-last-drop time]))
@@ -200,10 +198,27 @@
               (make-piece (make-posn 1 2) 'L 3))
 
 
+; Piece Playfield -> Piece
+; Return the Piece after it was moved down as much as possible
+(define (tetris-soft-drop t)
+  (define piece (tetris-piece t))
+  (define plf (tetris-playfield t))
+  (let* ([new-piece (try-move-piece 'down piece plf)]
+         [same (equal? piece new-piece)])
+    (if same t
+        (tetris-soft-drop
+         (struct-copy tetris t [piece new-piece])))))
+
+
+; Piece, Playfeld -> GhostY
+(define (tetris-calc-ghostY t)
+  (posn-y (piece-posn (tetris-piece (tetris-soft-drop t)))))
+
+
 ; Tetris -> Piece
 (define (tetris-ghost-piece t)
   (let* ([p (tetris-piece t)]
-         [ghostY  (tetris-ghostY t)]
+         [ghostY  (tetris-calc-ghostY t)]
          [pieceX (posn-x (piece-posn p))]
          [ghost-posn (make-posn pieceX ghostY)])
     (struct-copy piece p
@@ -251,7 +266,7 @@
   (cond
     [(key=? k "left") (tetris-move t 'left)]
     [(key=? k "right") (tetris-move t 'right)]
-    [(key=? k " ") (tetris-move t 'soft-drop)]
+    [(key=? k " ") (tetris-soft-drop t)]
     [(or (key=? k "up") (key=? k "x")) (tetris-move t 'cw)]
     [(key=? k "z") (tetris-move t 'ccw)]
     [(key=? k "a") (tetris-move t 180)]
@@ -516,18 +531,6 @@
         rotated2)))
 
 
-; Piece Playfield -> Piece
-; Return the Piece after it was moved down as much as possible
-(define (soft-drop piece plf)
-  (let* ([new-piece (try-move-piece 'down piece plf)]
-         [same (equal? piece new-piece)])
-    (if same piece
-        (soft-drop new-piece plf))))
-(check-equal? (soft-drop (make-piece (make-posn 5 (- HEIGHT 3)) 'L 0) '())
-              (make-piece (make-posn 5 -1) 'L 0))
-
-
-
 (define plf-full1 `(,@(build-list 10 (λ (x) (make-block (make-posn x 0) 'ghost)))
                  ,(make-block (make-posn 5 1) 'ghost)
                  ,@(build-list 10 (λ (x) (make-block (make-posn x 2) 'ghost)))
@@ -578,11 +581,6 @@
           (draw-any-blocks plf-cleared1)))
 
 
-; Piece, Playfeld -> GhostY
-(define (piece-ghostY p plf)
-  (posn-y (piece-posn (soft-drop p plf))))
-
-
 ; Piece, Playfield -> Playfield
 (define (add-piece-to-playfield p plf)
   (de-nest (list (piece-blocks p) plf)))
@@ -597,7 +595,7 @@
          [plf1 (add-piece-to-playfield p plf)]
          [plf2 (clear-lines plf1)] 
          [new-piece (spawn-piece)]
-         [new-ghostY (piece-ghostY new-piece plf2)])
+         [new-ghostY (tetris-calc-ghostY t)])
     (struct-copy tetris t
                  [playfield plf2]
                  [piece new-piece]
@@ -672,7 +670,7 @@
 
 
 ; Tetris, Move -> Tetris
-; Move is one of '(left right cw ccw 180 soft-drop)
+; Move is one of '(left right cw ccw 180)
 (define (tetris-move t mov)
   (let* ([p (tetris-piece t)]
          [plf (tetris-playfield t)]
@@ -681,9 +679,8 @@
             [(or (eq? mov 'left) (eq? mov 'right)) (try-move-piece mov p plf)]
             [(or (eq? mov 'cw) (eq? mov 'ccw)) (try-rotate-piece mov p plf)]
             [(eq? mov 180) (try-rotate-piece-180 p plf)]
-            [(eq? mov 'soft-drop) (soft-drop p plf)]
             [else (error "Invalid argument for move.")])]
-         [new-ghostY (piece-ghostY new-piece plf)])
+         [new-ghostY (tetris-calc-ghostY t)])
     (struct-copy tetris t
                  [piece new-piece]
                  [ghostY new-ghostY])))
