@@ -198,21 +198,21 @@
               (make-piece (make-posn 1 2) 'L 3))
 
 
-; Piece Playfield -> Piece
+; Tetris -> Tetris
 ; Return the Piece after it was moved down as much as possible
-(define (tetris-soft-drop t)
-  (define piece (tetris-piece t))
+(define (tetris-drop-to-ground t)
+    (define piece (tetris-piece t))
   (define plf (tetris-playfield t))
   (let* ([new-piece (try-move-piece 'down piece plf)]
          [same (equal? piece new-piece)])
     (if same t
-        (tetris-soft-drop
+        (tetris-drop-to-ground
          (struct-copy tetris t [piece new-piece])))))
 
 
 ; Piece, Playfeld -> GhostY
 (define (tetris-calc-ghostY t)
-  (posn-y (piece-posn (tetris-piece (tetris-soft-drop t)))))
+  (posn-y (piece-posn (tetris-piece (tetris-drop-to-ground t)))))
 
 
 ; Tetris -> Piece
@@ -258,19 +258,6 @@
 ; Tetris Key -> Boolean
 (define (tetris-key-pressed? t k)
   (hash-ref (tetris-h-key-state t) k #f))
-
-
-; Tetris Key -> Tetris
-; called when a key is just pressed
-(define (tetris-key-just-pressed t k ms)
-  (cond
-    [(key=? k "left") (tetris-move t 'left)]
-    [(key=? k "right") (tetris-move t 'right)]
-    [(key=? k " ") (tetris-soft-drop t)]
-    [(or (key=? k "up") (key=? k "x")) (tetris-move t 'cw)]
-    [(key=? k "z") (tetris-move t 'ccw)]
-    [(key=? k "a") (tetris-move t 180)]
-    [else t]))
 
 
 ; Tetris, Key, Boolean -> Tetris
@@ -685,5 +672,20 @@
                  [piece new-piece]
                  [ghostY new-ghostY])))
 
-;; (require racket/trace)
-;; (trace draw-any-blocks)
+
+; Piece Playfield -> Piece
+(define (tetris-soft-drop t)
+  (tetris-lock-and-spawn (tetris-drop-to-ground t)))
+
+
+; Tetris Key -> Tetris
+; called when a key is just pressed
+(define (tetris-key-just-pressed t k ms)
+  (cond
+    [(key=? k "left") (tetris-move t 'left)]
+    [(key=? k "right") (tetris-move t 'right)]
+    [(key=? k " ") (tetris-soft-drop t)]
+    [(or (key=? k "up") (key=? k "x")) (tetris-move t 'cw)]
+    [(key=? k "z") (tetris-move t 'ccw)]
+    [(key=? k "a") (tetris-move t 180)]
+    [else t]))
