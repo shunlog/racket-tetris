@@ -8,9 +8,11 @@
 
 (require racket/contract)
 (provide
- ;; Returns an empty Playfield of a given size (w, h)
  (contract-out
+  ;; Returns an empty Playfield of a given size (w, h)
   [empty-playfield (-> natural-number/c natural-number/c playfield?)]
+
+  [playfield? any/c]
 
   ;; Field accessors
   [playfield-width (-> playfield? natural-number/c)]
@@ -63,7 +65,6 @@
 
 (define (playfield-height p)
   (playfield-h p))
-
 
 
 ; Playfield Block -> Playfield
