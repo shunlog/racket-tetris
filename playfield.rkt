@@ -15,8 +15,8 @@
   [playfield? any/c]
 
   ;; Field accessors
-  [playfield-width (-> playfield? natural-number/c)]
-  [playfield-height (-> playfield? natural-number/c)]
+  [playfield-cols (-> playfield? natural-number/c)]
+  [playfield-rows (-> playfield? natural-number/c)]
 
   ;; Add blocks to a Playfield
   [playfield-add-block (-> playfield? block? playfield?)]
@@ -41,10 +41,10 @@
 
 
 ; A Playfield is a Struct:
-; - w (width): natural
-; - h (height): natural
+; - cols: natural
+; - rows: natural
 ; - bset (blocks data)
-(struct playfield [w h block-hash])
+(struct playfield [cols rows block-hash])
 
 
 ; -------------------------------
@@ -69,21 +69,14 @@
   (hash-map hash key-val-to-block))
 
 
-(define (playfield-width p)
-  (playfield-w p))
-
-
-(define (playfield-height p)
-  (playfield-h p))
-
 
 (module+ test  
   (test-case
       "Create an empty Playfield"
     (define plf0 (empty-playfield 10 20))
     (check-equal? (playfield-blocks plf0) '())
-    (check-equal? (playfield-width plf0) 10)
-    (check-equal? (playfield-height plf0) 20))
+    (check-equal? (playfield-cols plf0) 10)
+    (check-equal? (playfield-rows plf0) 20))
   )
 
 

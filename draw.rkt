@@ -55,30 +55,49 @@
      (format "Not a color: ~v (for type ~v in block-colors hash)." color t))))
 
 
-(define (block-image b)
+(define (draw-block b)
   (define type (block-type b))
   (define color (hash-ref block-color type))
   (overlay
-   (square (- BLOCK-W 1) "solid" color)
-   (square BLOCK-W "solid" (make-color 20 20 20))))
+   (square (- BLOCK-W 2) "solid" color)
+   (square BLOCK-W
+           "solid"
+           (make-color 30 30 30))))
 
+
+; Image Natural Color -> Image
+(define (draw-border-around-img img thickness color)
+  (define img-width (image-width img))
+  (define img-height (image-height img))
+  (define width (+ thickness img-width))
+  (define height (+ thickness img-height))
+  (overlay/align "middle" "middle"
+                 img
+                 (rectangle width height "solid" color)))
 
 
 (define (draw-playfield p)
-  (define cols (playfield-width p))
-  (define rows (playfield-height p))
-
-  (define (draw-block b grid)
+  (define cols (playfield-cols p))
+  (define rows (playfield-rows p))
+  (define grid-width (* BLOCK-W cols))
+  (define grid-height (* BLOCK-W rows))
+  
+  (define (draw-block-on-grid b grid)
     (define x (* BLOCK-W (block-x b)))
     (define y (* BLOCK-W (- rows (block-y b))))
-    (place-image/align (block-image b)
+    (place-image/align (draw-block b)
                        x y
                        "left" "bottom"
                        grid))
-  (foldr draw-block
-         (empty-scene (* BLOCK-W cols)
-                      (* BLOCK-W rows))
-         (playfield-blocks p)))
+  (define (draw-grid)
+    (foldr draw-block-on-grid
+           (rectangle grid-width grid-height "solid" "white")
+           (playfield-blocks p)))
+  
+  (~> (draw-grid)
+      (draw-border-around-img 3 "gray")
+      (draw-border-around-img 5 "white")
+      (draw-border-around-img 3 "darkgray")))
 
 
 ;; ....
