@@ -4,7 +4,13 @@
 
 (provide
  (contract-out
-  (shape-names (or/c (listof symbol?)))))
+  (SHAPE-NAMES (listof symbol?))
+  (shape-name? (-> any/c boolean?))))
 
-(define shape-names
+
+(define SHAPE-NAMES
   '(L J S Z O I T))
+
+
+(define (shape-name? sexp)
+  (not (not (member sexp SHAPE-NAMES))))

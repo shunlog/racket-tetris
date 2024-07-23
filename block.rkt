@@ -9,18 +9,18 @@
   [struct block ((x natural-number/c)
                  (y natural-number/c)
                  (type block-type?))]
-  [block-types (listof symbol?)]
+  [BLOCK-TYPES (listof symbol?)]
   [strings-to-blocks (-> (listof (λ (s)
                                    (for/and ([ch s])
                                      (member (string->symbol (string ch))
-                                             (cons '|.| block-types)))))
+                                             (cons '|.| BLOCK-TYPES)))))
                          (listof block?))]))
 
-(define block-types
-  (append shape-names '(ghost garbage)))
+(define BLOCK-TYPES
+  (append SHAPE-NAMES '(ghost garbage)))
 
 (define (block-type? t)
-  (member t block-types))
+  (member t BLOCK-TYPES))
 
 (struct block [x y type]
   #:transparent)

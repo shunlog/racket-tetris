@@ -18,7 +18,7 @@
 
 (define BLOCK-W 20)
 
-(define block-color
+(define BLOCK-COLOR-HASH
   (hash 'L "dark orange"
         'J "medium blue"
         'S 'green
@@ -47,17 +47,17 @@
 
 
 (module+ test
-  (for ([t block-types])
-    (define color (hash-ref block-color t #f))
-    (check-not-false color (format "No color specified for type ~v in block-colors hash." t))
+  (for ([t BLOCK-TYPES])
+    (define color (hash-ref BLOCK-COLOR-HASH t #f))
+    (check-not-false color (format "No color specified for type ~v in BLOCK-COLOR-HASHs hash." t))
     (check-true
      (image-color? color)   
-     (format "Not a color: ~v (for type ~v in block-colors hash)." color t))))
+     (format "Not a color: ~v (for type ~v in BLOCK-COLOR-HASHs hash)." color t))))
 
 
 (define (draw-block b)
   (define type (block-type b))
-  (define color (hash-ref block-color type))
+  (define color (hash-ref BLOCK-COLOR-HASH type))
   (overlay
    (square (- BLOCK-W 2) "solid" color)
    (square BLOCK-W
