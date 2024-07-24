@@ -16,7 +16,7 @@
   [shape-name->blocks (-> shape-name? rotation? (listof block?))]
   [shape-width (-> shape-name? natural-number/c)]
   [shape-gap-below (-> shape-name? natural-number/c)]
-  [7-loop-shape-generator generator?]
+  [7-loop-shape-generator (and/c generator? (-> shape-name?))]
   ))
 
 
