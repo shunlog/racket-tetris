@@ -6,6 +6,8 @@
 (require racket/contract)
 (require "playfield.rkt")
 (require "block.rkt")
+(require "frozen-tetris.rkt")
+
 
 (provide
  (contract-out
@@ -127,3 +129,10 @@
   (~> (empty-playfield 10 5)
       (playfield-add-block* blocks)
       (draw-playfield)))
+
+
+(module+ test
+  (displayln "Drawing a new FrozenTetris")
+  (~> (new-frozen-tetris)
+      frozen-tetris-playfield
+      draw-playfield))
