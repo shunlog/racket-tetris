@@ -118,7 +118,7 @@
 
 (module+ test
   (displayln "Drawing two sets of tetrominoes in a 4x10")
-  (define blocks (strings-to-blocks
+  (define blocks (strings->blocks
                   '("..."
                     "LLLZZIIIII"
                     "LTTTZZOOJI"

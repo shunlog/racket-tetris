@@ -10,7 +10,7 @@
                  (y natural-number/c)
                  (type block-type?))]
   [BLOCK-TYPES (listof symbol?)]
-  [strings-to-blocks (-> (listof (λ (s)
+  [strings->blocks (-> (listof (λ (s)
                                    (for/and ([ch s])
                                      (member (string->symbol (string ch))
                                              (cons '|.| BLOCK-TYPES)))))
@@ -30,7 +30,7 @@
 ; to a list of blocks.
 ; Each character is a block, and is taken as the block type,
 ; except for the "." which signifies an empty space
-(define (strings-to-blocks sl)
+(define (strings->blocks sl)
   (for/fold ([acc-ls '()])
             ([y (in-inclusive-range (sub1 (length sl)) 0 -1)]
              [s sl])
@@ -41,9 +41,9 @@
               (block x y (string->symbol (string ch)))))))
 
 (test-case
-    "strings-to-blocks"
+    "strings->blocks"
   (define blocks
-    (strings-to-blocks
+    (strings->blocks
      '("LJS.O"
        ".LIO")))
   (define expected

@@ -10,7 +10,7 @@
 (provide
  (contract-out
   ;; Returns an empty Playfield of a given size (w, h)
-  [empty-playfield (-> natural-number/c natural-number/c playfield?)]
+  [empty-playfield (->* () (natural-number/c natural-number/c) playfield?)]
 
   [playfield? any/c]
 
@@ -33,8 +33,10 @@
 ; -------------------------------
 ; Requires
 
-(require racket/set)
+
+(require "utils.rkt")
 (require "block.rkt")
+
 
 ;; ----------------------------
 ;; Definitions
@@ -58,7 +60,7 @@
 
 
 ; Natural, Natural -> Playfield
-(define (empty-playfield w h)  (playfield w h (hash)))
+(define (empty-playfield [w 10] [h 20])  (playfield w h (hash)))
 
 
 ; Playfield -> List[Block]
@@ -73,10 +75,10 @@
 (module+ test  
   (test-case
       "Create an empty Playfield"
-    (define plf0 (empty-playfield 10 20))
+    (define plf0 (empty-playfield 8 15))
     (check-equal? (playfield-blocks plf0) '())
-    (check-equal? (playfield-cols plf0) 10)
-    (check-equal? (playfield-rows plf0) 20))
+    (check-equal? (playfield-cols plf0) 8)
+    (check-equal? (playfield-rows plf0) 15))
   )
 
 
@@ -112,10 +114,8 @@
     (define pl2 (playfield-add-block
                  (playfield-add-block pl0 (block 1 1 'L))
                  (block 1 2 'J)))
-    (check-true
-     (set=?  ;; we don't care about the order, so we create sets instead of lists
-      (apply set (playfield-blocks pl2))
-      (set (block 1 1 'L) (block 1 2 'J))))
+    (check-true (block-lists=? (playfield-blocks pl2)
+                    (list (block 1 1 'L) (block 1 2 'J))))
     
     ;; Expect error when thereis a blocks at given position already
     (define pl3 (playfield-add-block pl0 (block 1 1 'L)))
@@ -139,10 +139,8 @@
     (define bl1 (list (block 0 1 'J)
                       (block 1 2 'S)))
     (define pl2 (playfield-add-block* pl0 bl1))
-    (check-not-false
-     (set=?
-      (apply set (playfield-blocks pl2))
-      (apply set bl1)))
+    (check-true
+     (block-lists=? (playfield-blocks pl2) bl1))
     
     ;; Error if any block fails to be added (so none will be added)
     (check-exn
