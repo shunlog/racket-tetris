@@ -131,6 +131,10 @@
       (draw-playfield)))
 
 
+(define (draw-frozen-tetris ft)
+  (draw-playfield (frozen-tetris-playfield ft)))
+
+
 (module+ test
   (displayln "Drawing a new FrozenTetris")
   (define ft0 (new-frozen-tetris))
@@ -138,6 +142,6 @@
   (define ft-drop2 (frozen-tetris-drop ft-drop1))
   (define ft-drop3 (frozen-tetris-drop ft-drop2))
   (beside (~> ft0 frozen-tetris-playfield draw-playfield)
-          (~> ft-drop1 frozen-tetris-playfield draw-playfield)
-          (~> ft-drop2 frozen-tetris-playfield draw-playfield)
-          (~> ft-drop3 frozen-tetris-playfield draw-playfield)))
+          (~> ft-drop1 draw-frozen-tetris)
+          (~> ft-drop2 draw-frozen-tetris)
+          (~> ft-drop3 draw-frozen-tetris)))
