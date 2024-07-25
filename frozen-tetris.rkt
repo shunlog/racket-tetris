@@ -22,7 +22,8 @@
 (provide
  (contract-out
   [new-frozen-tetris (-> frozen-tetris?)]
-  [frozen-tetris-playfield (-> frozen-tetris? playfield?)]))
+  [frozen-tetris-playfield (-> frozen-tetris? playfield?)]
+  [frozen-tetris-drop (-> frozen-tetris? frozen-tetris?)]))
 
 
 ; -------------------------------
@@ -118,9 +119,12 @@
     ))
 
 
-(define (new-frozen-tetris)
+(define (new-frozen-tetris [shape-generator 7-loop-shape-generator])
   (frozen-tetris-spawn
-   (frozen-tetris #f (empty-playfield) 7-loop-shape-generator)))
+   (frozen-tetris
+    #f
+    (empty-playfield)
+    shape-generator)))
 
 
 (define (piece-blocks piece)
@@ -129,6 +133,18 @@
   (define blocks-at-origin (shape-name->blocks sname rot))
   (for/list ([blck blocks-at-origin])
     (block-move blck (piece-posn piece))))
+
+
+; Add two Posn's
+(define (posn+ p1 p2)
+  (make-posn (+ (posn-x p1) (posn-x p2))
+        (+ (posn-y p1) (posn-y p2))))
+
+
+; Add a posn to piece position
+(define (piece-move p posn)
+  (struct-copy piece p
+               [posn (posn+ posn (piece-posn p))]))
 
 
 ; FrozenTetris -> Playfield
@@ -162,3 +178,57 @@
                         (strings->blocks '(".T."
                                            "TTT"
                                            "...")))))))
+
+
+; FrozenTetris -> FrozenTetris
+(define (frozen-tetris-drop ft)
+  (define new-piece (piece-move (frozen-tetris-piece ft)
+                                (make-posn 0 -1)))
+  (displayln (piece-posn new-piece))
+  (displayln (piece-blocks new-piece))
+  (define locked (frozen-tetris-locked ft))
+  (cond
+    [(playfield-can-place? locked (piece-blocks new-piece))
+     (struct-copy frozen-tetris ft
+                  [piece new-piece])]
+    [else (error "Can't drop piece")]))
+
+
+(module+ test
+  (test-case
+      "frozen-tetris-drop"
+    (define ft0
+      (frozen-tetris
+       (piece (make-posn 0 0) 'I 0)
+       (~> (empty-playfield 4 3)
+           (playfield-add-block* (strings->blocks '("JJ.."))))
+       7-loop-shape-generator))
+
+    ;; Successful drop
+    (define ft0-drop
+      (frozen-tetris-drop ft0))
+    (check
+     block-lists=?
+     (playfield-blocks (frozen-tetris-playfield ft0-drop))
+     (strings->blocks '("IIII"
+                        "JJ..")))
+
+    ;; Fail on collision with locked blocks
+    (check-exn
+     exn:fail?
+     (λ () (frozen-tetris-drop ft0-drop)))
+
+    ;; Fail on collision with bottom of playfield
+    (define ft1
+      (frozen-tetris
+       (piece (make-posn 0 -1) 'L 0)
+       (empty-playfield 4 3)
+       7-loop-shape-generator))    
+    (check-exn
+     exn:fail?
+     (λ () (frozen-tetris-drop ft1)))
+
+    ;; Should work on new instance
+    (check-not-exn
+     (λ () (frozen-tetris-drop (new-frozen-tetris))))
+    ))

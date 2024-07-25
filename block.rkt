@@ -102,6 +102,13 @@
 (module+ test
   (test-case
       "block-move: add Posn to Block"
-      (check-equal?
-       (block-move (block 1 1 'L) (make-posn 2 -1))
-       (block 3 0 'L))))
+    ;; Works fine
+    (check-equal?
+     (block-move (block 1 1 'L) (make-posn 2 -1))
+     (block 3 0 'L))
+
+    ;; Error if pos is negative
+    (check-exn
+     exn:fail?
+     (λ () (block-move (block 0 0 'L) (make-posn -1 0))))
+    ))

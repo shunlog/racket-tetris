@@ -19,6 +19,7 @@
   [playfield-rows (-> playfield? natural-number/c)]
 
   ;; Add blocks to a Playfield
+  [playfield-can-place? (-> playfield? (or/c block? (listof block?)) boolean?)]
   [playfield-add-block (-> playfield? block? playfield?)]
   [playfield-add-block* (-> playfield? (listof block?) playfield?)]
 
@@ -107,10 +108,10 @@
       "playfield-can-place?"
     (define plf0 (empty-playfield 3 3))
 
-    ;; Can place
+    ;; Can place above ceiling (vanish zone
     (check-true
-     (playfield-can-place? plf0 (block 1 1 'L)))
-
+     (playfield-can-place? plf0 (block 1 4 'L)))
+    
     ;; Collides with block
     (define plf1 (playfield-add-block plf0 (block 1 1 'L)))
     (check-false
