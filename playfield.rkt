@@ -82,14 +82,58 @@
   )
 
 
+; Playfield (or/c Block (listof Block)) -> Boolean
+(define (playfield-can-place? p block-or-list)
+  (define (can-place-block? block)
+    (define x (block-x block))
+    (define y (block-y block))
+    (define hash (playfield-block-hash p))
+    (cond
+      [(hash-ref hash (list x y) #f) #f]
+      [(>= x (playfield-cols p)) #f]
+      [(< x 0) #f]
+      [(< y 0) #f]
+      [else #t]))
+  (cond
+    [(list? block-or-list)
+     (for/and ([block block-or-list])
+       (can-place-block? block))]
+    [(block? block-or-list)
+     (can-place-block? block-or-list)]
+    [else (error "Invalid argument")]))
+
+(module+ test  
+  (test-case
+      "playfield-can-place?"
+    (define plf0 (empty-playfield 3 3))
+
+    ;; Can place
+    (check-true
+     (playfield-can-place? plf0 (block 1 1 'L)))
+
+    ;; Collides with block
+    (define plf1 (playfield-add-block plf0 (block 1 1 'L)))
+    (check-false
+     (playfield-can-place? plf1 (block 1 1 'J)))
+    
+    ;; Out of bounds
+    (check-false
+     (playfield-can-place? plf0 (block 3 0 'J)))
+
+    ;; Works on lists too
+    (check-false
+     (playfield-can-place? plf1 (list (block 0 0 'J) (block 1 1 'L))))
+    ))
+
+
 ; Playfield Block -> Playfield
 (define (playfield-add-block p block)
   (define x (block-x block))
   (define y (block-y block))
   (define hash (playfield-block-hash p))
   (cond
-    [(hash-ref hash (list x y) #f)
-     (error "There already exists a block at given position:" (list x y))]
+    [(not (playfield-can-place? p block))
+     (error "Can't place block at position " (list x y))]
     [else
      (define btype (block-type block))
 
