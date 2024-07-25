@@ -1,14 +1,26 @@
 #lang racket/base
 
 (require threading)
+(require 2htdp/universe)
 
 (require "playfield.rkt")
 (require "block.rkt")
+(require "frozen-tetris.rkt")
+(require "draw.rkt")
 
 
-(~> (empty-playfield 1 0)
-    (playfield-add-block (block 0 0 'L))
-    (playfield-add-block* (list
-                           (block 0 1 'ghost)
-                           (block 0 1 'garbage)))
-    (playfield-blocks))
+(big-bang (new-frozen-tetris)
+          [to-draw draw-frozen-tetris]
+          [on-key
+           (λ (ft k)
+             (cond
+               [(key=? k "down")
+                (with-handlers ([exn:fail? (λ (e) ft)])
+                  (frozen-tetris-drop ft))]
+               [(key=? k "left")
+                (with-handlers ([exn:fail? (λ (e) ft)])
+                  (frozen-tetris-left ft))]
+               [(key=? k "right")
+                (with-handlers ([exn:fail? (λ (e) ft)])
+                  (frozen-tetris-right ft))]
+               [else ft]))])

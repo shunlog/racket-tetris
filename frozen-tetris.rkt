@@ -17,13 +17,26 @@
 ;;   - gravity
 ;;   - lock delay
 
+;; FrozenTetris is supposed to be wrapped by a Tetris "driver",
+;; which will handle the rest of the logic.
+;; Because of that, it's useful to make some functions raise exceptions,
+;; for example to make `frozen-tetris-drop` raise an exception
+;; when the piece is already on the floor.
+;; This way, the Tetris driver can immediately know that it's time to lock the piece,
+;; and doesn't have to double check if the piece has moved, for example,
+;; as it would be the case if the drop function returned the unmodified frozen-tetris.
+
+
 
 (require racket/contract)
 (provide
  (contract-out
   [new-frozen-tetris (-> frozen-tetris?)]
+  [frozen-tetris? (-> any/c boolean?)]
   [frozen-tetris-playfield (-> frozen-tetris? playfield?)]
-  [frozen-tetris-drop (-> frozen-tetris? frozen-tetris?)]))
+  [frozen-tetris-drop (-> frozen-tetris? frozen-tetris?)]
+  [frozen-tetris-right (-> frozen-tetris? frozen-tetris?)]
+  [frozen-tetris-left (-> frozen-tetris? frozen-tetris?)]))
 
 
 ; -------------------------------
@@ -180,23 +193,21 @@
                                            "...")))))))
 
 
-; FrozenTetris -> FrozenTetris
-(define (frozen-tetris-drop ft)
-  (define new-piece (piece-move (frozen-tetris-piece ft)
-                                (make-posn 0 -1)))
-  (displayln (piece-posn new-piece))
-  (displayln (piece-blocks new-piece))
+; FrozenTetris Posn -> FrozenTetris
+(define (frozen-tetris-move ft posn)
+  (define new-piece (piece-move (frozen-tetris-piece ft) posn))
   (define locked (frozen-tetris-locked ft))
   (cond
     [(playfield-can-place? locked (piece-blocks new-piece))
      (struct-copy frozen-tetris ft
                   [piece new-piece])]
-    [else (error "Can't drop piece")]))
+    [else (error "Can't move piece by " posn)]))
 
 
+; FrozenTetris -> FrozenTetris
 (module+ test
   (test-case
-      "frozen-tetris-drop"
+      "Move the frozen-tetris piece"
     (define ft0
       (frozen-tetris
        (piece (make-posn 0 0) 'I 0)
@@ -204,9 +215,9 @@
            (playfield-add-block* (strings->blocks '("JJ.."))))
        7-loop-shape-generator))
 
-    ;; Successful drop
+    ;; Successful move
     (define ft0-drop
-      (frozen-tetris-drop ft0))
+      (frozen-tetris-move ft0 (make-posn 0 -1)))
     (check
      block-lists=?
      (playfield-blocks (frozen-tetris-playfield ft0-drop))
@@ -216,19 +227,39 @@
     ;; Fail on collision with locked blocks
     (check-exn
      exn:fail?
-     (λ () (frozen-tetris-drop ft0-drop)))
+     (λ () (frozen-tetris-move ft0-drop (make-posn 0 -1))))
 
     ;; Fail on collision with bottom of playfield
     (define ft1
       (frozen-tetris
        (piece (make-posn 0 -1) 'L 0)
-       (empty-playfield 4 3)
+       (empty-playfield 3 3)
        7-loop-shape-generator))    
     (check-exn
      exn:fail?
-     (λ () (frozen-tetris-drop ft1)))
+     (λ () (frozen-tetris-move ft1 (make-posn 0 -1))))
 
+    ;; Fail on collision with right border    
+    (check-exn
+     exn:fail?
+     (λ () (frozen-tetris-move ft1 (make-posn 1 0))))
+
+    ;; Fail on collision with left border    
+    (check-exn
+     exn:fail?
+     (λ () (frozen-tetris-move ft1 (make-posn -1 0))))
+    
     ;; Should work on new instance
     (check-not-exn
-     (λ () (frozen-tetris-drop (new-frozen-tetris))))
+     (λ () (frozen-tetris-move (new-frozen-tetris) (make-posn 0 -1))))
     ))
+
+
+(define (frozen-tetris-drop ft)
+  (frozen-tetris-move ft (make-posn 0 -1)))
+
+(define (frozen-tetris-right ft)
+  (frozen-tetris-move ft (make-posn 1 0)))
+
+(define (frozen-tetris-left ft)
+  (frozen-tetris-move ft (make-posn -1 0)))

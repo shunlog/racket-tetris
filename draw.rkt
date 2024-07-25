@@ -12,6 +12,7 @@
 (provide
  (contract-out
   [draw-playfield (-> playfield? image?)]
+  [draw-frozen-tetris (-> frozen-tetris? image?)]
   ))
 
 
