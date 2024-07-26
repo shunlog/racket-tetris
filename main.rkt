@@ -1,28 +1,27 @@
 #lang racket/base
 
-(require threading)
 (require 2htdp/universe)
-
-(require "playfield.rkt")
-(require "block.rkt")
-(require "frozen-tetris.rkt")
+(require 2htdp/image)
+(require threading)
+(require "tetris.rkt")
 (require "draw.rkt")
 
 
-(big-bang (new-frozen-tetris)
-          [to-draw draw-frozen-tetris]
-          [on-key
-           (λ (ft k)
-             (cond
-               [(key=? k "down")
-                (with-handlers ([exn:fail? (λ (e) ft)])
-                  (frozen-tetris-drop ft))]
-               [(key=? k "left")
-                (with-handlers ([exn:fail? (λ (e) ft)])
-                  (frozen-tetris-left ft))]
-               [(key=? k "right")
-                (with-handlers ([exn:fail? (λ (e) ft)])
-                  (frozen-tetris-right ft))]
-               [(key=? k "l")
-                (frozen-tetris-lock ft)]
-               [else ft]))])
+(define (millis)
+  (~> (current-inexact-monotonic-milliseconds)
+      floor
+      inexact->exact))
+
+
+(define (tetris-on-key t k ms)
+  (cond
+    [(key=? k "left") (tetris-pressed-left t ms)]
+    [(key=? k "right") (tetris-pressed-right t ms)]
+    [(key=? k "down") (tetris-drop t ms)]
+    [else t]))
+
+(big-bang (new-tetris)
+          [on-key (λ (t k) (tetris-on-key t k (millis)))]
+          [to-draw
+           (λ (t)
+             (draw-tetris t))])

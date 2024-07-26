@@ -7,12 +7,13 @@
 (require "playfield.rkt")
 (require "block.rkt")
 (require "frozen-tetris.rkt")
-
+(require "tetris.rkt")
 
 (provide
  (contract-out
   [draw-playfield (-> playfield? image?)]
   [draw-frozen-tetris (-> frozen-tetris? image?)]
+  [draw-tetris (-> tetris? image?)]
   ))
 
 
@@ -146,3 +147,6 @@
           (~> ft-drop1 draw-frozen-tetris)
           (~> ft-drop2 draw-frozen-tetris)
           (~> ft-drop3 draw-frozen-tetris)))
+
+(define (draw-tetris t)
+  (draw-frozen-tetris (tetris-ft t)))
