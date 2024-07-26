@@ -23,4 +23,6 @@
                [(key=? k "right")
                 (with-handlers ([exn:fail? (λ (e) ft)])
                   (frozen-tetris-right ft))]
+               [(key=? k "l")
+                (frozen-tetris-lock ft)]
                [else ft]))])

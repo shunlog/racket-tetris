@@ -17,14 +17,19 @@
 ;;   - gravity
 ;;   - lock delay
 
-;; FrozenTetris is supposed to be wrapped by a Tetris "driver",
+
+;; All of the movement functions raise an exception if the piece can't be moved.
+;; For example `frozen-tetris-drop` will raise an exception when the piece is already on the floor.
+;; The lock and spawn functions raise exceptions when it's game-over.
+;;
+;; This is useful for the Tetris "driver" that wraps the FrozenTetris
 ;; which will handle the rest of the logic.
-;; Because of that, it's useful to make some functions raise exceptions,
-;; for example to make `frozen-tetris-drop` raise an exception
-;; when the piece is already on the floor.
-;; This way, the Tetris driver can immediately know that it's time to lock the piece,
-;; and doesn't have to double check if the piece has moved, for example,
-;; as it would be the case if the drop function returned the unmodified frozen-tetris.
+;; This way, the Tetris driver can immediately know that it's time to lock the piece.
+;; This is a better solution than the two alternatives:
+;;   1. return #f on failure
+;;   2. return an unmodified FrozenTetris
+;; In the 1st case, we could forget to check for the false value, and it would propagate further
+;; In the 2nd case, we would have to double check if the piece has moved, which is redundant
 
 
 
@@ -36,7 +41,8 @@
   [frozen-tetris-playfield (-> frozen-tetris? playfield?)]
   [frozen-tetris-drop (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-right (-> frozen-tetris? frozen-tetris?)]
-  [frozen-tetris-left (-> frozen-tetris? frozen-tetris?)]))
+  [frozen-tetris-left (-> frozen-tetris? frozen-tetris?)]
+  [frozen-tetris-lock (-> frozen-tetris? frozen-tetris?)]))
 
 
 ; -------------------------------
@@ -98,8 +104,12 @@
     (piece (make-posn piece-x piece-y)
            sname
            0))
-  (struct-copy frozen-tetris ft
-               [piece new-piece]))
+  (cond
+    [(not (playfield-can-place? (frozen-tetris-locked ft)
+                                (piece-blocks new-piece)))
+     (error "Can't spawn piece (block out)")]
+    [else (struct-copy frozen-tetris ft
+                  [piece new-piece])]))
 
 
 (module+ test
@@ -109,6 +119,7 @@
       (frozen-tetris (piece (make-posn 0 0) 'L 0)
                      (empty-playfield 10 2)
                      7-loop-shape-generator))
+    ;; Spawn an L on the left
     (check
      block-lists=?
      (~> ft0
@@ -120,6 +131,7 @@
                         ".........."
                         "..........")))
 
+    ;; Spawn a I in the middle
     (check
      block-lists=?
      (~> ft0
@@ -128,11 +140,24 @@
          playfield-blocks)
      (strings->blocks '("...IIII..."
                         ".........."
-                        "..........")))
-    ))
+                        ".........."))))
+  
+  (test-case
+      "Block out: the spawned piece overlaps with locked blocks."
+    
+    (define ft-full
+      (struct-copy
+       frozen-tetris
+       (new-frozen-tetris 10 20)
+       [locked (playfield-add-blocks (empty-playfield 10 20)
+                             (list (block 5 21 'I)))]))
+    (check-exn
+     #rx"block out"
+     (λ () (frozen-tetris-spawn ft-full 'L))))
+  )
 
 
-(define (new-frozen-tetris [shape-generator 7-loop-shape-generator])
+(define (new-frozen-tetris [cols 10] [rows 20] [shape-generator 7-loop-shape-generator])
   (frozen-tetris-spawn
    (frozen-tetris
     #f
@@ -263,3 +288,48 @@
 
 (define (frozen-tetris-left ft)
   (frozen-tetris-move ft (make-posn -1 0)))
+
+
+
+(define (frozen-tetris-lock ft)
+  (define piece (frozen-tetris-piece ft))
+  (define plf-rows (playfield-rows (frozen-tetris-locked ft)))
+  (define piece-min-y
+    (+ (posn-y (piece-posn piece))
+       (shape-gap-below (piece-shape-name piece))))
+  (cond
+    [(>= piece-min-y plf-rows)
+     (error "All piece blocks above ceiling: lock out")]
+    [else
+     (define new-locked
+       (~> ft
+           frozen-tetris-piece
+           piece-blocks
+           (playfield-add-blocks (frozen-tetris-locked ft) _)))
+     (define ft-locked
+       (struct-copy frozen-tetris ft
+                    [locked new-locked]))
+     (frozen-tetris-spawn ft-locked)]))
+
+(module+ test
+  (test-case
+      "Lock out: a piece locks when it is entirely above the ceiling."
+
+    ;; Lock out if locked right after spawn (since pieces spawn above the ceiling)
+    (define ft0
+      (new-frozen-tetris))
+    (check-exn
+     #rx"lock out"
+     (λ () (frozen-tetris-lock ft0)))
+
+    ;; No lock out if at least a single block below ceiling
+    (define ft-dropped
+      (~> (new-frozen-tetris)
+          frozen-tetris-drop
+          ; move it out of the way
+          frozen-tetris-right
+          frozen-tetris-right
+          frozen-tetris-right))
+    (check-not-exn
+     (λ () (frozen-tetris-lock ft-dropped)))    
+    ))
