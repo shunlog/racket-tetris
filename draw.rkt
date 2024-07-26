@@ -109,7 +109,7 @@
 (module+ test
   (displayln "Drawing a T on a 3x4 grid:")
   (~> (empty-playfield 4 3)
-      (playfield-add-block*
+      (playfield-add-blocks
        (list
         (block 0 0 'T)
         (block 1 0 'T)
@@ -128,7 +128,7 @@
                     "OOTSSTOOJI"
                     "OOSSTTTJJI")))
   (~> (empty-playfield 10 5)
-      (playfield-add-block* blocks)
+      (playfield-add-blocks blocks)
       (draw-playfield)))
 
 

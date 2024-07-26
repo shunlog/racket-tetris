@@ -21,7 +21,7 @@
   ;; Add blocks to a Playfield
   [playfield-can-place? (-> playfield? (or/c block? (listof block?)) boolean?)]
   [playfield-add-block (-> playfield? block? playfield?)]
-  [playfield-add-block* (-> playfield? (listof block?) playfield?)]
+  [playfield-add-blocks (-> playfield? (listof block?) playfield?)]
 
   ;; Get a list of Blocks in the Playfield
   [playfield-blocks (-> playfield? (listof block?))]
@@ -171,7 +171,7 @@
 
 
 ; Playifeld List[Block] -> Playfield
-(define (playfield-add-block* p bl)
+(define (playfield-add-blocks p bl)
   (foldl (λ (b p) (playfield-add-block p b)) p bl))
 
 
@@ -183,14 +183,14 @@
     ; Add list of blocks
     (define bl1 (list (block 0 1 'J)
                       (block 1 2 'S)))
-    (define pl2 (playfield-add-block* pl0 bl1))
+    (define pl2 (playfield-add-blocks pl0 bl1))
     (check-true
      (block-lists=? (playfield-blocks pl2) bl1))
     
     ;; Error if any block fails to be added (so none will be added)
     (check-exn
      #rx"position.*1.*2"
-     (λ () (playfield-add-block* pl0 (list (block 1 2 'L)
+     (λ () (playfield-add-blocks pl0 (list (block 1 2 'L)
                                            (block 1 2 'J)))))
     ))
 

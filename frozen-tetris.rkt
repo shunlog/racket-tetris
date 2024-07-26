@@ -164,7 +164,7 @@
 (define (frozen-tetris-playfield ft)
   (define locked (frozen-tetris-locked ft))
   (define piece (frozen-tetris-piece ft))
-  (playfield-add-block*
+  (playfield-add-blocks
    locked
    (piece-blocks piece)))
 
@@ -175,7 +175,7 @@
 
     ;; A Piece and some locked blocks
     (define plf1
-      (playfield-add-block*
+      (playfield-add-blocks
        (empty-playfield)
        (strings->blocks '("JJ."))))
     (define ft1
@@ -186,7 +186,7 @@
     (check
      block-lists=?
      (playfield-blocks (frozen-tetris-playfield ft1))
-     (playfield-blocks (playfield-add-block*
+     (playfield-blocks (playfield-add-blocks
                         plf1
                         (strings->blocks '(".T."
                                            "TTT"
@@ -212,7 +212,7 @@
       (frozen-tetris
        (piece (make-posn 0 0) 'I 0)
        (~> (empty-playfield 4 3)
-           (playfield-add-block* (strings->blocks '("JJ.."))))
+           (playfield-add-blocks (strings->blocks '("JJ.."))))
        7-loop-shape-generator))
 
     ;; Successful move
