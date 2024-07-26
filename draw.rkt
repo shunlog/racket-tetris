@@ -22,15 +22,15 @@
 (define BLOCK-W 20)
 
 (define BLOCK-COLOR-HASH
-  (hash 'L "dark orange"
-        'J "medium blue"
-        'S 'green
-        'Z "red"
-        'T "dark violet"
-        'I "aqua"
-        'O 'yellow
-        'ghost "lightgray"
-        'garbage "gray"))
+  (hash 'L (make-color 255 128 0)
+        'J (make-color 0 132 255)
+        'S (make-color 0 217 51)
+        'Z (make-color 245 7 7)
+        'T (make-color 205 7 245)
+        'I (make-color 0 247 255)
+        'O (make-color 242 235 12)
+        'ghost (color 196 196 196)
+        'garbage (color 156 154 154)))
 
 
 ;; --------------------------

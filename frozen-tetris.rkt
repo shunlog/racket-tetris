@@ -71,6 +71,14 @@
 ; A Piece is a struct:
 ; - posn: Posn
 ; - shape-name: one of shape-names
+
+;; Think of the Piece as a "blueprint" instead of actual blocks,
+;; visualize it as a lump of faded blocks that you can move around.
+;; When you lock, you simply add the blueprint blocks to the `locked` Playfield,
+;; but the blueprint doesn't change, it's still there in the same place,
+;; overlapping with the blocks you just added.
+;; Spawning a new piece then simply means creating a new blueprint.
+;; With this in mind, it doesn't make sense to ever set the Piece to #f.
 (struct piece [posn shape-name rotation])
 
 ; -------------------------------
