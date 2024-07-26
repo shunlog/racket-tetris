@@ -32,7 +32,6 @@
 ;; In the 2nd case, we would have to double check if the piece has moved, which is redundant
 
 
-
 (require racket/contract)
 (provide
  (contract-out
@@ -74,10 +73,13 @@
 
 ;; Think of the Piece as a "blueprint" instead of actual blocks,
 ;; visualize it as a lump of faded blocks that you can move around.
-;; When you lock, you simply add the blueprint blocks to the `locked` Playfield,
-;; but the blueprint doesn't change, it's still there in the same place,
-;; overlapping with the blocks you just added.
-;; Spawning a new piece then simply means creating a new blueprint.
+;;
+;; Some consequences:
+;; 1. Locking means adding the blueprint blocks to the `locked` Playfield.
+;;   The blueprint doesn't change, it's still there in the same place,
+;;   overlapping with the blocks you just added.
+;; 2. Spawning a new piece then simply means creating a new blueprint.
+;;
 ;; With this in mind, it doesn't make sense to ever set the Piece to #f.
 (struct piece [posn shape-name rotation])
 
@@ -299,7 +301,11 @@
 
 
 
-(define (frozen-tetris-lock ft)
+; FrozenTetris -> FrozenTetris
+; Locks piece (applies the "blueprint" Piece).
+; Doesn't spawn new piece or clear lines.
+; Raises if locked out.
+(define (frozen-tetris--lock ft)
   (define piece (frozen-tetris-piece ft))
   (define plf-rows (playfield-rows (frozen-tetris-locked ft)))
   (define piece-min-y
@@ -314,10 +320,9 @@
            frozen-tetris-piece
            piece-blocks
            (playfield-add-blocks (frozen-tetris-locked ft) _)))
-     (define ft-locked
-       (struct-copy frozen-tetris ft
-                    [locked new-locked]))
-     (frozen-tetris-spawn ft-locked)]))
+     (struct-copy frozen-tetris ft
+                  [locked new-locked])]))
+
 
 (module+ test
   (test-case
@@ -328,7 +333,7 @@
       (new-frozen-tetris))
     (check-exn
      #rx"lock out"
-     (λ () (frozen-tetris-lock ft0)))
+     (λ () (frozen-tetris--lock ft0)))
 
     ;; No lock out if at least a single block below ceiling
     (define ft-dropped
@@ -339,5 +344,10 @@
           frozen-tetris-right
           frozen-tetris-right))
     (check-not-exn
-     (λ () (frozen-tetris-lock ft-dropped)))    
+     (λ () (frozen-tetris--lock ft-dropped)))    
     ))
+
+
+(define (frozen-tetris-lock ft)
+  (~> (frozen-tetris--lock ft)
+      frozen-tetris-spawn))
