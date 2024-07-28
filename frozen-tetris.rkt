@@ -35,7 +35,11 @@
 (require racket/contract)
 (provide
  (contract-out
-  [new-frozen-tetris (-> frozen-tetris?)]
+  [new-frozen-tetris (->* ()
+                          (#:rows natural-number/c
+                           #:cols natural-number/c
+                           #:shape-generator shape-generator?)
+                          frozen-tetris?)]
   [frozen-tetris? (-> any/c boolean?)]
   [frozen-tetris-playfield (-> frozen-tetris? playfield?)]
   [frozen-tetris-drop (-> frozen-tetris? frozen-tetris?)]
@@ -158,7 +162,7 @@
     (define ft-full
       (struct-copy
        frozen-tetris
-       (new-frozen-tetris 10 20)
+       (new-frozen-tetris)
        [locked (playfield-add-blocks (empty-playfield 10 20)
                              (list (block 5 21 'I)))]))
     (check-exn
@@ -167,12 +171,13 @@
   )
 
 
-(define (new-frozen-tetris [cols 10] [rows 20] [shape-generator 7-loop-shape-generator])
-  (frozen-tetris-spawn
-   (frozen-tetris
-    #f
-    (empty-playfield)
-    shape-generator)))
+(define (new-frozen-tetris #:cols [cols 10]
+                           #:rows [rows 20]
+                           #:shape-generator [shape-generator 7-loop-shape-generator])
+  (frozen-tetris
+   (piece (make-posn 0 0) 'L 0)
+   (empty-playfield cols rows)
+   shape-generator))
 
 
 (define (piece-blocks piece)
@@ -330,7 +335,7 @@
 
     ;; Lock out if locked right after spawn (since pieces spawn above the ceiling)
     (define ft0
-      (new-frozen-tetris))
+      (frozen-tetris-spawn (new-frozen-tetris)))
     (check-exn
      #rx"lock out"
      (λ () (frozen-tetris--lock ft0)))

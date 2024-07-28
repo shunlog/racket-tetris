@@ -16,7 +16,8 @@
   [shape-name->blocks (-> shape-name? rotation? (listof block?))]
   [shape-width (-> shape-name? natural-number/c)]
   [shape-gap-below (-> shape-name? natural-number/c)]
-  [7-loop-shape-generator (and/c generator? (-> shape-name?))]
+  [shape-generator? contract?]
+  [7-loop-shape-generator shape-generator?]
   ))
 
 
@@ -117,8 +118,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+(define shape-generator?
+  (and/c generator? (-> shape-name?)))
+
+
+;; Guarantees the order and starting shape
 (define 7-loop-shape-generator
-  (sequence->repeated-generator SHAPE-NAMES))
+  (sequence->repeated-generator '(L J S Z O I T)))
 
 
 ;;;;;;;;;;;;;;;;;

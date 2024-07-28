@@ -26,7 +26,7 @@
 
 
 (define (tetris-run)
-  (big-bang (new-tetris)
+  (big-bang (new-tetris (millis))
             [on-tick (λ (t) (tetris-on-tick t (millis)))]
             [on-key (λ (t k) (tetris-on-key t k (millis)))]
             [to-draw
