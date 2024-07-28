@@ -36,16 +36,17 @@
 (provide
  (contract-out
   [new-frozen-tetris (->* ()
-                          (#:rows natural-number/c
-                           #:cols natural-number/c
-                           #:shape-generator shape-generator?)
+                          (shape-name?
+                           #:rows natural-number/c
+                           #:cols natural-number/c)
                           frozen-tetris?)]
   [frozen-tetris? (-> any/c boolean?)]
   [frozen-tetris-playfield (-> frozen-tetris? playfield?)]
   [frozen-tetris-drop (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-right (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-left (-> frozen-tetris? frozen-tetris?)]
-  [frozen-tetris-lock (-> frozen-tetris? frozen-tetris?)]))
+  [frozen-tetris-lock (-> frozen-tetris? frozen-tetris?)]
+  [frozen-tetris-spawn (-> frozen-tetris? shape-name? frozen-tetris?)]))
 
 
 ; -------------------------------
@@ -68,7 +69,7 @@
 ; A FrozenTetris is a struct:
 ; - piece: Piece
 ; - locked: Playfield
-(struct frozen-tetris [piece locked shape-generator])
+(struct frozen-tetris [piece locked])
 
 
 ; A Piece is a struct:
@@ -83,8 +84,12 @@
 ;;   The blueprint doesn't change, it's still there in the same place,
 ;;   overlapping with the blocks you just added.
 ;; 2. Spawning a new piece then simply means creating a new blueprint.
-;;
-;; With this in mind, it doesn't make sense to ever set the Piece to #f.
+
+;; After locking, we want to clear the "blueprint",
+;; otherwise its blocks would overlap with the locked blocks,
+;; which isn't a valid state.
+;; That means setting the Piece to #f should be a valid state.
+;; We should keep in mind this possibility whenever we try to move/rotate the piece.
 (struct piece [posn shape-name rotation])
 
 ; -------------------------------
@@ -97,33 +102,30 @@
   (displayln "Running tests."))
 
 
-(define (frozen-tetris-spawn ft [shape-name #f])
-  (define sname
-    (if (not shape-name)
-        ((frozen-tetris-shape-generator ft))
-        shape-name))
+;; Spawns a given shape,
+;; meaning changes the piece "blueprint"
+(define (frozen-tetris-spawn ft shape-name)
   (define grid-cols
     (~> ft frozen-tetris-locked playfield-cols))
   (define grid-rows
     (~> ft frozen-tetris-locked playfield-rows))
   (define piece-x
-    (floor (/ (- grid-cols (shape-width sname)) 2)))
-  (define y-spawn
-    ; the lowest blocks should spawn on the first line of the vanish zone,
-    ; so if there are 20 rows, it should spawn on row with index 20 (0-based)
-    grid-rows)
+    (floor (/ (- grid-cols (shape-width shape-name)) 2)))
+
+  ;; the lowest blocks should spawn on the first line of the vanish zone,
+  ;; so if there are 20 rows, it should spawn on row with index 20 (0-based)
   (define piece-y
-    (- y-spawn (shape-gap-below sname)))
+    (- grid-rows (shape-gap-below shape-name)))
+  
   (define new-piece
-    (piece (make-posn piece-x piece-y)
-           sname
-           0))
+    (piece (make-posn piece-x piece-y) shape-name 0))
+  
   (cond
     [(not (playfield-can-place? (frozen-tetris-locked ft)
                                 (piece-blocks new-piece)))
      (error "Can't spawn piece (block out)")]
     [else (struct-copy frozen-tetris ft
-                  [piece new-piece])]))
+                       [piece new-piece])]))
 
 
 (module+ test
@@ -131,8 +133,7 @@
       "Spawn a piece"
     (define ft0
       (frozen-tetris (piece (make-posn 0 0) 'L 0)
-                     (empty-playfield 10 2)
-                     7-loop-shape-generator))
+                     (empty-playfield 10 2)))
     ;; Spawn an L on the left
     (check
      block-lists=?
@@ -162,22 +163,20 @@
     (define ft-full
       (struct-copy
        frozen-tetris
-       (new-frozen-tetris)
+       (new-frozen-tetris 'O)
        [locked (playfield-add-blocks (empty-playfield 10 20)
-                             (list (block 5 21 'I)))]))
+                                     (list (block 5 21 'I)))]))
     (check-exn
      #rx"block out"
      (λ () (frozen-tetris-spawn ft-full 'L))))
   )
 
 
-(define (new-frozen-tetris #:cols [cols 10]
-                           #:rows [rows 20]
-                           #:shape-generator [shape-generator 7-loop-shape-generator])
-  (frozen-tetris
-   (piece (make-posn 0 0) 'L 0)
-   (empty-playfield cols rows)
-   shape-generator))
+(define (new-frozen-tetris [shape-name #f]
+                           #:cols [cols 10]
+                           #:rows [rows 20])
+  (~> (frozen-tetris #f (empty-playfield cols rows))
+      (frozen-tetris-spawn shape-name)))
 
 
 (define (piece-blocks piece)
@@ -191,7 +190,7 @@
 ; Add two Posn's
 (define (posn+ p1 p2)
   (make-posn (+ (posn-x p1) (posn-x p2))
-        (+ (posn-y p1) (posn-y p2))))
+             (+ (posn-y p1) (posn-y p2))))
 
 
 ; Add a posn to piece position
@@ -221,8 +220,7 @@
     (define ft1
       (frozen-tetris
        (piece (make-posn 0 0) 'T 0)
-       plf1
-       7-loop-shape-generator))
+       plf1))
     (check
      block-lists=?
      (playfield-blocks (frozen-tetris-playfield ft1))
@@ -252,8 +250,7 @@
       (frozen-tetris
        (piece (make-posn 0 0) 'I 0)
        (~> (empty-playfield 4 3)
-           (playfield-add-blocks (strings->blocks '("JJ.."))))
-       7-loop-shape-generator))
+           (playfield-add-blocks (strings->blocks '("JJ.."))))))
 
     ;; Successful move
     (define ft0-drop
@@ -273,8 +270,7 @@
     (define ft1
       (frozen-tetris
        (piece (make-posn 0 -1) 'L 0)
-       (empty-playfield 3 3)
-       7-loop-shape-generator))    
+       (empty-playfield 3 3)))    
     (check-exn
      exn:fail?
      (λ () (frozen-tetris-move ft1 (make-posn 0 -1))))
@@ -291,7 +287,7 @@
     
     ;; Should work on new instance
     (check-not-exn
-     (λ () (frozen-tetris-move (new-frozen-tetris) (make-posn 0 -1))))
+     (λ () (frozen-tetris-move (new-frozen-tetris 'L) (make-posn 0 -1))))
     ))
 
 
@@ -307,10 +303,9 @@
 
 
 ; FrozenTetris -> FrozenTetris
-; Locks piece (applies the "blueprint" Piece).
-; Doesn't spawn new piece or clear lines.
-; Raises if locked out.
-(define (frozen-tetris--lock ft)
+; Locks piece (adds the blocks to `locked`) and clears the blueprint (sets Piece to #f)
+; Raises error on lock out.
+(define (frozen-tetris-lock ft)
   (define piece (frozen-tetris-piece ft))
   (define plf-rows (playfield-rows (frozen-tetris-locked ft)))
   (define piece-min-y
@@ -326,33 +321,27 @@
            piece-blocks
            (playfield-add-blocks (frozen-tetris-locked ft) _)))
      (struct-copy frozen-tetris ft
-                  [locked new-locked])]))
+                  [locked new-locked]
+                  [piece #f])]))
 
 
 (module+ test
   (test-case
-      "Lock out: a piece locks when it is entirely above the ceiling."
-
-    ;; Lock out if locked right after spawn (since pieces spawn above the ceiling)
-    (define ft0
-      (frozen-tetris-spawn (new-frozen-tetris)))
+      "Lock out if locked right after spawn (since pieces spawn above the ceiling)"    
+    (define ft0 (new-frozen-tetris 'L))
     (check-exn
      #rx"lock out"
-     (λ () (frozen-tetris--lock ft0)))
+     (λ () (frozen-tetris-lock ft0))))
 
-    ;; No lock out if at least a single block below ceiling
+  
+  (test-case
+      "No lock out if at least a single block below ceiling"
     (define ft-dropped
-      (~> (new-frozen-tetris)
+      (~> (new-frozen-tetris 'O)
           frozen-tetris-drop
           ; move it out of the way
           frozen-tetris-right
           frozen-tetris-right
           frozen-tetris-right))
     (check-not-exn
-     (λ () (frozen-tetris--lock ft-dropped)))    
-    ))
-
-
-(define (frozen-tetris-lock ft)
-  (~> (frozen-tetris--lock ft)
-      frozen-tetris-spawn))
+     (λ () (frozen-tetris-lock ft-dropped)))))

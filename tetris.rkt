@@ -61,12 +61,9 @@
                     #:cols [cols 10]
                     #:rows [rows 20]
                     #:shape-generator [shape-generator 7-loop-shape-generator])
-  (define ft (frozen-tetris-spawn
-              (frozen-tetris
-               (piece (make-posn 0 0) 'L 0)
-               (empty-playfield cols rows)
-               shape-generator)))
-  
+  (define ft (new-frozen-tetris (shape-generator)
+                                #:cols cols
+                                #:rows rows))
   (tetris ft ms))
 
 
