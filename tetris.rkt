@@ -10,14 +10,18 @@
   [tetris-ft (-> tetris? frozen-tetris?)]
   [tetris-pressed-left (-> tetris? natural-number/c tetris?)]
   [tetris-pressed-right (-> tetris? natural-number/c tetris?)]
-  [tetris-drop (-> tetris? natural-number/c tetris?)]))
+  [tetris-on-tick (-> tetris? natural-number/c tetris?)]
+  ;; [tetris-on-key (-> tetris? )]
+  ))
 
 ; -------------------------------
 ; Requires
 
 
 (require threading)
+(require 2htdp/universe)
 (require "frozen-tetris.rkt")
+
 
 ;; ----------------------------
 ;; Definitions
@@ -60,10 +64,28 @@
                [ft new-ft]))
 
 
-(define (tetris-drop t ms)
+;; Apply gravity or soft-drop if "down" is being held.
+(define (tetris-gravity-tick t ms)
   (define ft (tetris-ft t))
   (define new-ft
     (with-handlers ([exn:fail? (λ (e) ft)])
       (frozen-tetris-drop ft)))
   (struct-copy tetris t
                [ft new-ft]))
+
+(module+ test
+  (define t0 (new-tetris)))
+
+
+
+;;;;;;;;;;;;;;
+;; Big Bang ;;
+;;;;;;;;;;;;;;
+
+
+(define (tetris-on-tick t ms)
+  (~> t
+      (tetris-gravity-tick ms)))
+
+
+

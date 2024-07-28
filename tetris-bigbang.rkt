@@ -17,10 +17,11 @@
   (cond
     [(key=? k "left") (tetris-pressed-left t ms)]
     [(key=? k "right") (tetris-pressed-right t ms)]
-    [(key=? k "down") (tetris-drop t ms)]
     [else t]))
 
+
 (big-bang (new-tetris)
+          [on-tick (λ (t) (tetris-on-tick t (millis)))]
           [on-key (λ (t k) (tetris-on-key t k (millis)))]
           [to-draw
            (λ (t)
