@@ -1,5 +1,10 @@
 #lang racket/base
 
+
+(provide
+ tetris-run)
+
+
 (require 2htdp/universe)
 (require 2htdp/image)
 (require threading)
@@ -20,9 +25,10 @@
     [else t]))
 
 
-(big-bang (new-tetris)
-          [on-tick (λ (t) (tetris-on-tick t (millis)))]
-          [on-key (λ (t k) (tetris-on-key t k (millis)))]
-          [to-draw
-           (λ (t)
-             (draw-tetris t))])
+(define (tetris-run)
+  (big-bang (new-tetris)
+            [on-tick (λ (t) (tetris-on-tick t (millis)))]
+            [on-key (λ (t k) (tetris-on-key t k (millis)))]
+            [to-draw
+             (λ (t)
+               (draw-tetris t))]))
