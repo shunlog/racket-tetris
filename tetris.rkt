@@ -186,10 +186,26 @@
   )
 
 
-(define (tetris-hard-drop t ms)
-  (define new-ft (frozen-tetris-hard-drop (tetris-ft t)))
+(define (tetris-spawn t ms #:piece [piece #f])
+  (define new-ft (~> (tetris-ft t)
+                     (frozen-tetris-spawn piece)))
   (struct-copy tetris t
-               [ft new-ft]))
+               [ft new-ft]
+               [t-drop ms]))
+
+
+(define (tetris-lock t ms)
+  (define ft-locked (~> (tetris-ft t)
+                        frozen-tetris-lock))
+  (~> (struct-copy tetris t [ft ft-locked])
+      (tetris-spawn ms #:piece 'L)))
+
+
+(define (tetris-hard-drop t ms)
+  (define ft-dropped (~> (tetris-ft t)
+                         frozen-tetris-hard-drop))
+  (~> (struct-copy tetris t [ft ft-dropped])
+      (tetris-lock ms)))
 
 
 ;; Used in big-bang on every tick.
