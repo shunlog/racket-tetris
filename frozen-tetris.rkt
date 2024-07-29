@@ -36,7 +36,7 @@
 (provide
  (contract-out
   [new-frozen-tetris (->* ()
-                          (shape-name?
+                          ((or/c shape-name? false/c)
                            #:rows natural-number/c
                            #:cols natural-number/c)
                           frozen-tetris?)]
@@ -176,8 +176,10 @@
 (define (new-frozen-tetris [shape-name #f]
                            #:cols [cols 10]
                            #:rows [rows 20])
-  (~> (frozen-tetris #f (empty-playfield cols rows))
-      (frozen-tetris-spawn shape-name)))
+  (define new-ft (frozen-tetris #f (empty-playfield cols rows)))
+  (if (not shape-name)
+      new-ft
+      (frozen-tetris-spawn new-ft shape-name)))
 
 
 (define (piece-blocks piece)

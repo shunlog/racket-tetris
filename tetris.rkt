@@ -44,7 +44,7 @@
 
 ;; A Tetris is a struct:
 ;;   - ft: FrozenTetris
-(struct tetris [ft t-drop])
+(struct tetris [ft shape-generator t-drop])
 
 
 ; -------------------------------
@@ -61,10 +61,10 @@
                     #:cols [cols 10]
                     #:rows [rows 20]
                     #:shape-generator [shape-generator 7-loop-shape-generator])
-  (define ft (new-frozen-tetris (shape-generator)
-                                #:cols cols
+  (define ft (new-frozen-tetris #:cols cols
                                 #:rows rows))
-  (tetris ft ms))
+  (~> (tetris ft shape-generator ms)
+      (tetris-spawn ms)))
 
 
 (define (tetris-pressed-left t ms)
@@ -186,19 +186,21 @@
   )
 
 
-(define (tetris-spawn t ms #:piece [piece #f])
+(define (tetris-spawn t ms                             
+                      #:piece [piece ((tetris-shape-generator t))])
   (define new-ft (~> (tetris-ft t)
                      (frozen-tetris-spawn piece)))
-  (struct-copy tetris t
-               [ft new-ft]
-               [t-drop ms]))
+  ;; drop immediately if possible, so the player can see the block
+  (define ft-dropped (with-handlers ([exn:fail? (λ (e) new-ft)])
+                       (frozen-tetris-drop new-ft)))
+  (struct-copy tetris t [ft ft-dropped] [t-drop ms]))
 
 
 (define (tetris-lock t ms)
   (define ft-locked (~> (tetris-ft t)
                         frozen-tetris-lock))
   (~> (struct-copy tetris t [ft ft-locked])
-      (tetris-spawn ms #:piece 'L)))
+      (tetris-spawn ms)))
 
 
 (define (tetris-hard-drop t ms)
