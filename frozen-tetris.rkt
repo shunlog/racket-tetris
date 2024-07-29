@@ -43,6 +43,7 @@
   [frozen-tetris? (-> any/c boolean?)]
   [frozen-tetris-playfield (-> frozen-tetris? playfield?)]
   [frozen-tetris-drop (-> frozen-tetris? frozen-tetris?)]
+  [frozen-tetris-hard-drop (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-right (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-left (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-lock (-> frozen-tetris? frozen-tetris?)]
@@ -300,6 +301,68 @@
 (define (frozen-tetris-left ft)
   (frozen-tetris-move ft (make-posn -1 0)))
 
+
+;; Move the Piece as far down as possible
+(define (frozen-tetris-hard-drop ft)
+  (define dropped
+    (with-handlers ([exn:fail? (λ (e) #f)])
+      (frozen-tetris-drop ft)))
+  (if (not dropped)
+      ft
+      (frozen-tetris-hard-drop dropped)))
+
+
+(module+ test
+  (test-case
+      "Hard drop to the floor"
+    (define ft0 (new-frozen-tetris 'O #:cols 4 #:rows 2))
+    ;; assert initial setup
+    (check
+     block-lists=?
+     (playfield-blocks (frozen-tetris-playfield ft0))
+     (strings->blocks '(".OO."
+                        ".OO."
+                        "...."
+                        "....")))
+
+    (define ft-dropped (frozen-tetris-hard-drop ft0))
+    (check
+     block-lists=?
+     (playfield-blocks (frozen-tetris-playfield ft-dropped))
+     (strings->blocks '("...."
+                        "...."
+                        ".OO."
+                        ".OO.")))
+    )
+
+  (test-case
+      "Hard drop to a block"
+    (define ft0 (new-frozen-tetris 'O #:cols 4 #:rows 3))
+    (define plf1 (playfield-add-blocks (frozen-tetris-locked ft0)
+                                       (strings->blocks '("LL.."))))
+    (define ft1 (struct-copy frozen-tetris ft0 [locked plf1]))
+    
+    ;; assert initial setup
+    (check
+     block-lists=?
+     (playfield-blocks (frozen-tetris-playfield ft1))
+     (strings->blocks '(".OO."
+                        ".OO."
+                        "...."
+                        "...."
+                        "LL..")))
+
+    (define ft-dropped (frozen-tetris-hard-drop ft1))
+    (check
+     block-lists=?
+     (playfield-blocks (frozen-tetris-playfield ft-dropped))
+     (strings->blocks '("...."
+                        "...."
+                        ".OO."
+                        ".OO."
+                        "LL..")))
+    )
+  )
 
 
 ; FrozenTetris -> FrozenTetris

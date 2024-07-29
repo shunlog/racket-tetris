@@ -22,6 +22,7 @@
   (cond
     [(key=? k "left") (tetris-pressed-left t ms)]
     [(key=? k "right") (tetris-pressed-right t ms)]
+    [(key=? k " ") (tetris-hard-drop t ms)]
     [else t]))
 
 

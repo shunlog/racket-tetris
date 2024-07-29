@@ -14,6 +14,7 @@
   [tetris-ft (-> tetris? frozen-tetris?)]
   [tetris-pressed-left (-> tetris? natural-number/c tetris?)]
   [tetris-pressed-right (-> tetris? natural-number/c tetris?)]
+  [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
   [tetris-on-tick (-> tetris? natural-number/c tetris?)]
   ;; [tetris-on-key (-> tetris? )]
   ))
@@ -184,6 +185,11 @@
      0))
   )
 
+
+(define (tetris-hard-drop t ms)
+  (define new-ft (frozen-tetris-hard-drop (tetris-ft t)))
+  (struct-copy tetris t
+               [ft new-ft]))
 
 
 ;; Used in big-bang on every tick.
