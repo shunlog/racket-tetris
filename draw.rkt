@@ -20,7 +20,7 @@
 ;; --------------------------
 ;; Configuration constants
 
-(define BLOCK-W 20)
+(define BLOCK-W 15)
 
 (define BLOCK-COLOR-HASH
   (hash 'L (make-color 255 128 0)
