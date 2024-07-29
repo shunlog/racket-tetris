@@ -139,7 +139,7 @@
 
 (module+ test
   (displayln "Drawing a new FrozenTetris")
-  (define ft0 (new-frozen-tetris))
+  (define ft0 (new-frozen-tetris #:starting-shape 'L))
   (define ft-drop1 (frozen-tetris-drop ft0))
   (define ft-drop2 (frozen-tetris-drop ft-drop1))
   (define ft-drop3 (frozen-tetris-drop ft-drop2))

@@ -36,7 +36,7 @@
 (provide
  (contract-out
   [new-frozen-tetris (->* ()
-                          ((or/c shape-name? false/c)
+                          (#:starting-shape (or/c shape-name? false/c)
                            #:rows natural-number/c
                            #:cols natural-number/c)
                           frozen-tetris?)]
@@ -170,7 +170,7 @@
     (define ft-full
       (struct-copy
        frozen-tetris
-       (new-frozen-tetris 'O)
+       (new-frozen-tetris #:starting-shape 'O)
        [locked (playfield-add-blocks (empty-playfield 10 20)
                                      (list (block 5 21 'I)))]))
     (check-exn
@@ -179,13 +179,13 @@
   )
 
 
-(define (new-frozen-tetris [shape-name #f]
+(define (new-frozen-tetris #:starting-shape [start-shape #f]
                            #:cols [cols 10]
                            #:rows [rows 20])
   (define new-ft (frozen-tetris #f (empty-playfield cols rows)))
-  (if (not shape-name)
+  (if (not start-shape)
       new-ft
-      (frozen-tetris-spawn new-ft shape-name)))
+      (frozen-tetris-spawn new-ft start-shape)))
 
 
 ;; Return the blocks representing a Piece
@@ -286,7 +286,7 @@
 (module+ test
   (test-case
       "Rotate cw"
-    (define ft0 (new-frozen-tetris 'L #:cols 4 #:rows 2))
+    (define ft0 (new-frozen-tetris #:starting-shape 'L #:cols 4 #:rows 2))
 
     ;; assert initial setup
     (check
@@ -364,7 +364,7 @@
     
     ;; Should work on new instance
     (check-not-exn
-     (λ () (frozen-tetris-move (new-frozen-tetris 'L) (make-posn 0 -1))))
+     (λ () (frozen-tetris-move (new-frozen-tetris #:starting-shape 'L) (make-posn 0 -1))))
     ))
 
 
@@ -391,7 +391,7 @@
 (module+ test
   (test-case
       "Hard drop to the floor"
-    (define ft0 (new-frozen-tetris 'O #:cols 4 #:rows 2))
+    (define ft0 (new-frozen-tetris #:starting-shape 'O #:cols 4 #:rows 2))
     ;; assert initial setup
     (check
      block-lists=?
@@ -413,7 +413,7 @@
 
   (test-case
       "Hard drop to a block"
-    (define ft0 (new-frozen-tetris 'O #:cols 4 #:rows 3))
+    (define ft0 (new-frozen-tetris #:starting-shape 'O #:cols 4 #:rows 3))
     (define plf1 (playfield-add-blocks (frozen-tetris-locked ft0)
                                        (strings->blocks '("LL.."))))
     (define ft1 (struct-copy frozen-tetris ft0 [locked plf1]))
@@ -467,7 +467,7 @@
 (module+ test
   (test-case
       "Lock out if locked right after spawn (since pieces spawn above the ceiling)"    
-    (define ft0 (new-frozen-tetris 'L))
+    (define ft0 (new-frozen-tetris #:starting-shape 'L))
     (check-exn
      #rx"lock out"
      (λ () (frozen-tetris-lock ft0))))
@@ -476,7 +476,7 @@
   (test-case
       "No lock out if at least a single block below ceiling"
     (define ft-dropped
-      (~> (new-frozen-tetris 'O)
+      (~> (new-frozen-tetris #:starting-shape 'O)
           frozen-tetris-drop
           ; move it out of the way
           frozen-tetris-right
