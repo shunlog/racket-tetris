@@ -204,9 +204,11 @@
 (define (frozen-tetris-playfield ft)
   (define locked (frozen-tetris-locked ft))
   (define piece (frozen-tetris-piece ft))
-  (playfield-add-blocks
-   locked
-   (piece-blocks piece)))
+  (cond
+    [(not piece) (error "Piece is #f")]
+    [else (playfield-add-blocks
+           locked
+           (piece-blocks piece))]))
 
 
 (module+ test
@@ -229,7 +231,12 @@
                         plf1
                         (strings->blocks '(".T."
                                            "TTT"
-                                           "...")))))))
+                                           "..."))))))
+  (test-case
+      "Error if null Piece"
+    (check-exn
+     exn:fail?
+     (λ () (frozen-tetris-playfield (frozen-tetris #f (empty-playfield 3 3)))))))
 
 
 ; FrozenTetris Posn -> FrozenTetris
