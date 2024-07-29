@@ -4,7 +4,6 @@
 (require 2htdp/universe)
 
 (require "playfield.rkt")
-(require "block.rkt")
 (require "frozen-tetris.rkt")
 (require "draw.rkt")
 

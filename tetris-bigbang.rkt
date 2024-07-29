@@ -6,7 +6,6 @@
 
 
 (require 2htdp/universe)
-(require 2htdp/image)
 (require threading)
 (require "tetris.rkt")
 (require "draw.rkt")

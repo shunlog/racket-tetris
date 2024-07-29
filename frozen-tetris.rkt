@@ -54,7 +54,6 @@
 ; Requires
 
 
-(require racket/set)
 (require lang/posn)
 (require threading)
 (require "block.rkt")

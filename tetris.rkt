@@ -16,7 +16,6 @@
   [tetris-pressed-right (-> tetris? natural-number/c tetris?)]
   [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
   [tetris-on-tick (-> tetris? natural-number/c tetris?)]
-  ;; [tetris-on-key (-> tetris? )]
   ))
 
 ; -------------------------------
@@ -24,7 +23,6 @@
 
 
 (require threading)
-(require 2htdp/universe)
 (require "frozen-tetris.rkt")
 (require "playfield.rkt")
 (require "block.rkt")
