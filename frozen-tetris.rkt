@@ -41,11 +41,18 @@
                            #:cols natural-number/c)
                           frozen-tetris?)]
   [frozen-tetris? (-> any/c boolean?)]
+
+  ;; Accessors
   [frozen-tetris-playfield (-> frozen-tetris? playfield?)]
+
+  ;; Movement
   [frozen-tetris-drop (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-hard-drop (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-right (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-left (-> frozen-tetris? frozen-tetris?)]
+  [frozen-tetris-rotate (-> frozen-tetris? boolean? frozen-tetris?)]
+
+  ;; Other
   [frozen-tetris-lock (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-spawn (-> frozen-tetris? shape-name? frozen-tetris?)]))
 
@@ -181,6 +188,8 @@
       (frozen-tetris-spawn new-ft shape-name)))
 
 
+;; Return the blocks representing a Piece
+;; by adding the piece's position to each block representing its shape
 (define (piece-blocks piece)
   (define sname (piece-shape-name piece))
   (define rot (piece-rotation piece))
@@ -249,6 +258,65 @@
      (struct-copy frozen-tetris ft
                   [piece new-piece])]
     [else (error "Can't move piece by " posn)]))
+
+
+(define (frozen-tetris-rotate ft cw?)
+  (define p (frozen-tetris-piece ft))
+  (define shape-name (piece-shape-name p))
+  (define rot-initial (piece-rotation p))
+  (define rot-final (modulo (+ rot-initial (if cw? 1 -1)) 4))
+  (define rotated-p (struct-copy piece p [rotation rot-final]))
+  (define ft-rotated (struct-copy frozen-tetris ft [piece rotated-p]))
+  (define plf (frozen-tetris-playfield ft))
+
+  (define (moved-or-false kick)
+    (with-handlers
+      ([exn:fail? (λ (e) #f)])
+      (frozen-tetris-move ft-rotated (make-posn (car kick) (cadr kick)))))
+
+  (define new-ft
+    (for/first ([kick (kick-data shape-name rot-initial rot-final)]
+                #:when (moved-or-false kick))
+      (moved-or-false kick)))
+
+  (cond
+    [(not new-ft) (error "Can't rotate piece." ft)]
+    [else new-ft]))
+
+(module+ test
+  (test-case
+      "Rotate cw"
+    (define ft0 (new-frozen-tetris 'L #:cols 4 #:rows 2))
+
+    ;; assert initial setup
+    (check
+     block-lists=?
+     (playfield-blocks (frozen-tetris-playfield ft0))
+     (strings->blocks '("..L."
+                        "LLL."
+                        "...."
+                        "....")))
+
+    (define ft1 (frozen-tetris-rotate ft0 #t))
+    (check
+     block-lists=?
+     (playfield-blocks (frozen-tetris-playfield ft1))
+     (strings->blocks '(".L.."
+                        ".L.."
+                        ".LL."
+                        "....")))
+
+    (define ft2 (~> ft1
+                   frozen-tetris-left
+                   (frozen-tetris-rotate #t)))
+    (check
+     block-lists=?
+     (playfield-blocks (frozen-tetris-playfield ft2))
+     (strings->blocks '("...."
+                        "LLL."
+                        "L..."
+                        "....")))
+    ))
 
 
 ; FrozenTetris -> FrozenTetris

@@ -17,6 +17,8 @@
   [shape-width (-> shape-name? natural-number/c)]
   [shape-gap-below (-> shape-name? natural-number/c)]
   [shape-generator? contract?]
+  [kick-data (-> shape-name? rotation? rotation?
+                 (listof (list/c integer? integer?)))]
   [7-loop-shape-generator shape-generator?]
   ))
 
@@ -164,9 +166,13 @@
 
 ; A KickDataTable is a Hash:
 ; (Rotation . Rotation) -> List of (Pair of Integer)
-; Interpretation:
-;     map the (initial rotation, final rotation) pair
-;     to the list of "kicks" to try when rotating a shape.
+; It maps the (initial rotation, final rotation) pair
+; to the list of "kicks" to try when rotating a shape.
+
+; Rotating a piece might fail because of a wall or a nearby piece,
+; but it can succeed if you move left/right.
+; The "kicks" is a movement we apply to a piece before rotating it,
+; and a kick table is a sequence of kicks we try until one succeeds
 ; For details, see: https://tetris.wiki/Super_Rotation_System
 
 
@@ -205,3 +211,19 @@
                           [Z . ,h-kick-data-1]
                           [O . ,h-kick-data-1]
                           [T . ,h-kick-data-1])))
+
+
+; ShapeName Rotation Rotation -> (Listof (list integer integer))
+; Returns the list of kicks to try for given shape when rotating fails
+(define (kick-data sn rot-initial rot-final)
+  (define ls (hash-ref (hash-ref h-kick-data sn)
+                       (cons rot-initial rot-final)
+                       #f))
+  (if (not ls)
+      (error (format "No kick data for rotating ~v from ~v to ~v." sn rot-initial rot-final))
+      ls))
+
+(module+ test
+  (check-equal?
+   (kick-data 'L 3 0)
+   '(( 0  0) (-1  0) (-1 -1) ( 0 +2) (-1 +2))))

@@ -14,6 +14,8 @@
   [tetris-ft (-> tetris? frozen-tetris?)]
   [tetris-pressed-left (-> tetris? natural-number/c tetris?)]
   [tetris-pressed-right (-> tetris? natural-number/c tetris?)]
+  [tetris-rotate-cw (-> tetris? natural-number/c tetris?)]
+  [tetris-rotate-ccw (-> tetris? natural-number/c tetris?)]  
   [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
   [tetris-on-tick (-> tetris? natural-number/c tetris?)]
   ))
@@ -188,10 +190,7 @@
                       #:piece [piece ((tetris-shape-generator t))])
   (define new-ft (~> (tetris-ft t)
                      (frozen-tetris-spawn piece)))
-  ;; drop immediately if possible, so the player can see the block
-  (define ft-dropped (with-handlers ([exn:fail? (λ (e) new-ft)])
-                       (frozen-tetris-drop new-ft)))
-  (struct-copy tetris t [ft ft-dropped] [t-drop ms]))
+(struct-copy tetris t [ft new-ft] [t-drop ms]))
 
 
 (define (tetris-lock t ms)
@@ -206,6 +205,19 @@
                          frozen-tetris-hard-drop))
   (~> (struct-copy tetris t [ft ft-dropped])
       (tetris-lock ms)))
+
+
+(define (tetris--rotate t cw? ms)
+  (define new-ft (frozen-tetris-rotate (tetris-ft t) cw?))
+  (struct-copy tetris t
+               [ft new-ft]))
+
+
+(define (tetris-rotate-cw t ms)
+  (tetris--rotate t #t ms))
+
+(define (tetris-rotate-ccw t ms)
+  (tetris--rotate t #f ms))
 
 
 ;; Used in big-bang on every tick.
