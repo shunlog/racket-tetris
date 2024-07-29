@@ -21,6 +21,7 @@
 ;; Configuration constants
 
 (define BLOCK-W 15)
+(define VANISH-AREA-ROWS 2)
 
 (define BLOCK-COLOR-HASH
   (hash 'L (make-color 255 128 0)
@@ -85,20 +86,25 @@
   (define rows (playfield-rows p))
   (define grid-width (* BLOCK-W cols))
   (define grid-height (* BLOCK-W rows))
+  (define vanish-area-height (* BLOCK-W VANISH-AREA-ROWS))
+  (define grid (above
+                (rectangle grid-width vanish-area-height  "solid" "lightgray")
+                (rectangle grid-width grid-height "solid" "white")))
   
   (define (draw-block-on-grid b grid)
     (define x (* BLOCK-W (block-x b)))
-    (define y (* BLOCK-W (- rows (block-y b))))
+    (define y (* BLOCK-W (+ (- rows (block-y b))
+                            VANISH-AREA-ROWS)))
     (place-image/align (draw-block b)
                        x y
                        "left" "bottom"
                        grid))
-  (define (draw-grid)
+  (define (draw-blocks-on-grid)
     (foldr draw-block-on-grid
-           (rectangle grid-width grid-height "solid" "white")
+           grid
            (playfield-blocks p)))
   
-  (~> (draw-grid)
+  (~> (draw-blocks-on-grid)
       (draw-border-around-img 3 "gray")
       (draw-border-around-img 5 "white")
       (draw-border-around-img 3 "darkgray")))
