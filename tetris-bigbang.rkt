@@ -5,6 +5,8 @@
  tetris-run)
 
 
+(define RATE 120)  ;; frames/second
+
 (require 2htdp/universe)
 (require threading)
 (require "tetris.rkt")
@@ -47,7 +49,8 @@
 
 (define (tetris-run)
   (big-bang (new-tetris (millis))
-            [on-tick (λ (ws) (tetris-on-tick ws (millis)))]
+            [on-tick (λ (ws) (tetris-on-tick ws (millis)))
+                     (/ 1 RATE)]
             [on-key (λ (ws k) (tetris-on-key-filtered ws k (millis)))]
             [on-release (λ (ws k) (tetris-on-release-filtered ws k (millis)))]
             [to-draw (λ (ws) (draw-tetris ws))]))

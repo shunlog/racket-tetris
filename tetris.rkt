@@ -39,9 +39,10 @@
 ;; -------------------------------
 ;; Constants
 
-(define MS/DROP 1000)               ; ms before we drop due to gravity
-(define AUTOSHIFT 200)              ; ms before autoshift starts
-
+(define MS/DROP 1000)               ; ms/cell dropped due to gravity
+(define MS/AUTOSHIFT 40)            ; ms/cell moved during autoshift
+(define AUTOSHIFT-DELAY 180)        ; ms before autoshift starts
+(define MS/SOFT-DROP 200)           ; ms/cell dropped during soft-drop
 
 ;; ----------------------------
 ;; Definitions
@@ -52,7 +53,7 @@
 ;;   - t-drop: last time the piece was dropped due to gravity
 ;;   - t-dirn: last time when the piece started moving
 ;;             (when both direction had been depressed, and one of them was pressed)
-(struct tetris [ft pressed-hash t-drop t-dirn])
+(struct tetris [ft pressed-hash t-drop t-dirn t-autoshift])
 
 
 ; -------------------------------
@@ -67,7 +68,7 @@
 
 (define (new-tetris ms
                     #:frozen-tetris [frozen-tetris (new-frozen-tetris)])
-  (~> (tetris frozen-tetris (hash) ms 0)
+  (~> (tetris frozen-tetris (hash) ms 0 0)
       (tetris-spawn ms)))
 
 
@@ -261,18 +262,38 @@
   (tetris--rotate t #f ms))
 
 
-;; Apply autoshift if it's time to and a direction key is being held
+;; Move in dirn if enough time has passed since previous move
+(define (tetris--autoshift t ms dirn)
+  (define t-dirn (tetris-t-dirn t))
+  (define t-autoshift
+    (if (> t-dirn (tetris-t-autoshift t))
+        ;; first autoshift since started holding key, starts at this time
+        (+ t-dirn AUTOSHIFT-DELAY)
+        (tetris-t-autoshift t)))
+  
+  (define times-to-move (quotient (- ms t-autoshift) MS/AUTOSHIFT))
+  (define new-t-autoshift (+ t-autoshift (* times-to-move MS/AUTOSHIFT)))
+  (define t-moved
+    (for/fold ([t-acc t])
+              ([i (in-range times-to-move)])
+      (tetris--move t-acc ms dirn)))
+  (struct-copy tetris t-moved
+               [t-autoshift new-t-autoshift]))
+
+
+;; Called each tick,
+;; Start autoshifting if it's time to
 (define (tetris-autoshift-tick t ms)
   (define right (tetris--pressed? t 'right))
   (define left (tetris--pressed? t 'left))
   (define autoshift? (and (or right left)
-                          (> (- ms (tetris-t-dirn t)) AUTOSHIFT)))
+                          (> (- ms (tetris-t-dirn t)) AUTOSHIFT-DELAY)))
   (define right-last (> (tetris--pressed-t t 'right) (tetris--pressed-t t 'left)))
   
   (cond
     [(not autoshift?) t]
-    [(or (not left) (and right right-last)) (tetris--move t ms 'right)]
-    [else (tetris--move t ms 'left)]))
+    [(or (not left) (and right right-last)) (tetris--autoshift t ms 'right)]
+    [else (tetris--autoshift t ms 'left)]))
 
 
 ;; Used in big-bang on every tick.
