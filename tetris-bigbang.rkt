@@ -27,6 +27,7 @@
     [(key=? k "z") (tetris-rotate-ccw t ms)]
     [(or (key=? k "up") (key=? k "x")) (tetris-rotate-cw t ms)]
     [(key=? k " ") (tetris-hard-drop t ms)]
+    [(key=? k "down") (tetris-soft-drop-pressed t ms)]
     [else t]))
 
 
@@ -34,6 +35,7 @@
   (cond
     [(key=? k "left") (tetris-left-released t ms)]
     [(key=? k "right") (tetris-right-released t ms)]
+    [(key=? k "down") (tetris-soft-drop-released t ms)]
     [else t]))
 
 

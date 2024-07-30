@@ -1,8 +1,20 @@
 #lang racket/base
 
+
+;; -------------------------------
+;; Constants
+
+(define MS/DROP 1000)               ; ms/cell dropped due to gravity
+(define MS/AUTOSHIFT 40)            ; ms/cell moved during autoshift
+(define AUTOSHIFT-DELAY 180)        ; ms before autoshift starts
+(define MS/SOFT-DROP 50)           ; ms/cell dropped during soft-drop
+
+
+;; -------------------------------
+;; Provides
+
+
 (require racket/contract)
-
-
 (provide
  (contract-out
   [tetris? (-> any/c boolean?)]
@@ -11,18 +23,21 @@
                    tetris?)]
   [tetris-ft (-> tetris? frozen-tetris?)]
 
-  ;; Movement
+  ;; Player actions
   [tetris-left-pressed (-> tetris? natural-number/c tetris?)]
   [tetris-left-released (-> tetris? natural-number/c tetris?)]
   [tetris-right-pressed (-> tetris? natural-number/c tetris?)]
   [tetris-right-released (-> tetris? natural-number/c tetris?)]
+  [tetris-soft-drop-pressed (-> tetris? natural-number/c tetris?)]
+  [tetris-soft-drop-released (-> tetris? natural-number/c tetris?)]
   [tetris-rotate-cw (-> tetris? natural-number/c tetris?)]
   [tetris-rotate-ccw (-> tetris? natural-number/c tetris?)]  
   [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
 
-  ;; Others
+  ;; Big bang on-tick
   [tetris-on-tick (-> tetris? natural-number/c tetris?)]
   ))
+
 
 ; -------------------------------
 ; Requires
@@ -33,16 +48,7 @@
 (require "playfield.rkt")
 (require "block.rkt")
 (require "utils.rkt")
-(require "shapes.rkt")
 
-
-;; -------------------------------
-;; Constants
-
-(define MS/DROP 1000)               ; ms/cell dropped due to gravity
-(define MS/AUTOSHIFT 40)            ; ms/cell moved during autoshift
-(define AUTOSHIFT-DELAY 180)        ; ms before autoshift starts
-(define MS/SOFT-DROP 200)           ; ms/cell dropped during soft-drop
 
 ;; ----------------------------
 ;; Definitions
@@ -118,11 +124,21 @@
 (define (tetris-left-pressed t ms)
   (tetris--dirn-pressed t ms 'left))
 
+(define (tetris-soft-drop-pressed t ms)
+  (~> t
+      (tetris--set-pressed 'down ms #t)
+      ;; restart the drop timer so it doesn't drop too much at the start
+      ;; and subtract one time unit so it drops 1 block immediately
+      (struct-copy tetris _ [t-drop (- ms MS/SOFT-DROP)])))
+
 (define (tetris-right-released t ms)
   (tetris--set-pressed t 'right ms #f))
 
 (define (tetris-left-released t ms)
   (tetris--set-pressed t 'left ms #f))
+
+(define (tetris-soft-drop-released t ms)
+  (tetris--set-pressed t 'down ms #f))
 
 
 ;; Tetris -> Tetris
@@ -139,9 +155,13 @@
 
 ;; Apply gravity or soft-drop if it's time to and "down" is being held.
 (define (tetris-gravity-tick t ms)
+  (define drop-rate (if (tetris--pressed? t'down)
+                        MS/SOFT-DROP
+                        MS/DROP))
+  
   (define t-drop (tetris-t-drop t))
-  (define times-to-drop (quotient (- ms t-drop) MS/DROP))
-  (define new-t-drop (+ t-drop (* times-to-drop MS/DROP)))
+  (define times-to-drop (quotient (- ms t-drop) drop-rate))
+  (define new-t-drop (+ t-drop (* times-to-drop drop-rate)))
   (define (drop-n-times t n)
     (for/fold ([t-acc t])
               ([i (in-range n)])
