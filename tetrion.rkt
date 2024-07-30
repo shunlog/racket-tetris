@@ -1,11 +1,11 @@
 #lang racket/base
 
-;; This module implements a "Frozen" Tetris.
+;; This module implements a "frozen" Tetris, or a "Tetris machine".
 ;; Think of it as a Tetris that's been frozen in time:
 ;; all the inputs that have an immediate effect still work,
 ;; whereas everything that happens with a delay doesn't.
 ;;
-;; So pretty much everything is handled:
+;; You can all the basic actions:
 ;;   - pressing Left/Right moves the piece
 ;;   - pressing Space drops it
 ;;   - you can move the piece down with a function call
@@ -18,16 +18,24 @@
 ;;   - lock delay
 
 
+;; One quirk is that actions are handled a bit more atomically.
+;; For example, while you might expect that locking a piece would clear the lines,
+;; for the Tetrion these are separate actions.
+;; All of these are separate:
+;;   - locking the piece
+;;   - spawning a piece
+;;   - clearing lines (together with updating the score)
+
 ;; All of the movement functions raise an exception if the piece can't be moved.
-;; For example `frozen-tetris-drop` will raise an exception when the piece is already on the floor.
+;; For example `tetrion-drop` will raise an exception when the piece is already on the floor.
 ;; The lock and spawn functions raise exceptions when it's game-over.
 ;;
-;; This is useful for the Tetris "driver" that wraps the FrozenTetris
+;; This is useful for the Tetris "driver" that wraps the Tetrion
 ;; which will handle the rest of the logic.
 ;; This way, the Tetris driver can immediately know that it's time to lock the piece.
 ;; This is a better solution than the two alternatives:
 ;;   1. return #f on failure
-;;   2. return an unmodified FrozenTetris
+;;   2. return an unmodified Tetrion
 ;; In the 1st case, we could forget to check for the false value, and it would propagate further
 ;; In the 2nd case, we would have to double check if the piece has moved, which is redundant
 
@@ -35,30 +43,30 @@
 (require racket/contract)
 (provide
  (contract-out
-  [new-frozen-tetris (->* ()
+  [new-tetrion (->* ()
                           (#:starting-shape (or/c shape-name? boolean?)
                            #:rows natural-number/c
                            #:cols natural-number/c
                            #:shape-generator shape-generator?)
-                          frozen-tetris?)]
-  [frozen-tetris? (-> any/c boolean?)]
+                          tetrion?)]
+  [tetrion? (-> any/c boolean?)]
 
   ;; Accessors
-  [frozen-tetris-playfield (-> frozen-tetris? playfield?)]
+  [tetrion-playfield (-> tetrion? playfield?)]
 
   ;; Movement
-  [frozen-tetris-drop (-> frozen-tetris? frozen-tetris?)]
-  [frozen-tetris-hard-drop (-> frozen-tetris? frozen-tetris?)]
-  [frozen-tetris-right (-> frozen-tetris? frozen-tetris?)]
-  [frozen-tetris-left (-> frozen-tetris? frozen-tetris?)]
-  [frozen-tetris-rotate (-> frozen-tetris? boolean? frozen-tetris?)]
-  [frozen-tetris-rotate-180 (-> frozen-tetris? frozen-tetris?)]
+  [tetrion-drop (-> tetrion? tetrion?)]
+  [tetrion-hard-drop (-> tetrion? tetrion?)]
+  [tetrion-right (-> tetrion? tetrion?)]
+  [tetrion-left (-> tetrion? tetrion?)]
+  [tetrion-rotate (-> tetrion? boolean? tetrion?)]
+  [tetrion-rotate-180 (-> tetrion? tetrion?)]
 
   ;; Other
-  [frozen-tetris-lock (-> frozen-tetris? frozen-tetris?)]
-  [frozen-tetris-spawn (->* (frozen-tetris?)
+  [tetrion-lock (-> tetrion? tetrion?)]
+  [tetrion-spawn (->* (tetrion?)
                             (shape-name?)
-                            frozen-tetris?)]))
+                            tetrion?)]))
 
 
 ; -------------------------------
@@ -77,10 +85,10 @@
 ;; Definitions
 
 
-; A FrozenTetris is a struct:
+; A Tetrion is a struct:
 ; - piece: Piece
 ; - locked: Playfield
-(struct frozen-tetris [piece locked shape-generator])
+(struct tetrion [piece locked shape-generator])
 
 
 ; A Piece is a struct:
@@ -89,6 +97,8 @@
 
 ;; Think of the Piece as a "blueprint" instead of actual blocks,
 ;; visualize it as a lump of faded blocks that you can move around.
+;; When we draw the Tetrion, we convert the Piece to its constituent blocks,
+;; but internally, it is just a blueprint that we can move around and even set to #f.
 ;;
 ;; Some consequences:
 ;; 1. Locking means adding the blueprint blocks to the `locked` Playfield.
@@ -115,16 +125,16 @@
 
 ;; Spawns a given shape,
 ;; meaning changes the piece "blueprint"
-(define (frozen-tetris-spawn
-         ft 
-         [shape-name ((frozen-tetris-shape-generator ft))]
+(define (tetrion-spawn
+         tn 
+         [shape-name ((tetrion-shape-generator tn))]
          #:x [x #f]
          #:y [y #f]
          #:rotation [rotation 0])
   (define grid-cols
-    (~> ft frozen-tetris-locked playfield-cols))
+    (~> tn tetrion-locked playfield-cols))
   (define grid-rows
-    (~> ft frozen-tetris-locked playfield-rows))
+    (~> tn tetrion-locked playfield-rows))
   (define piece-x
     (or x
         (floor (/ (- grid-cols (shape-width shape-name)) 2))))
@@ -139,10 +149,10 @@
     (piece (make-posn piece-x piece-y) shape-name rotation))
   
   (cond
-    [(not (playfield-can-place? (frozen-tetris-locked ft)
+    [(not (playfield-can-place? (tetrion-locked tn)
                                 (piece-blocks new-piece)))
      (error "Can't spawn piece (block out)")]
-    [else (struct-copy frozen-tetris ft
+    [else (struct-copy tetrion tn
                        [piece new-piece])]))
 
 
@@ -150,14 +160,14 @@
   (test-case
       "Spawn a piece"
     (define ft0
-      (new-frozen-tetris #:starting-shape 'L
+      (new-tetrion #:starting-shape 'L
                          #:cols 10 #:rows 2))
     ;; Spawn an L on the left
     (check
      block-lists=?
      (~> ft0
-         (frozen-tetris-spawn 'L)
-         frozen-tetris-playfield
+         (tetrion-spawn 'L)
+         tetrion-playfield
          playfield-blocks)
      (strings->blocks '(".....L...."
                         "...LLL...."
@@ -168,8 +178,8 @@
     (check
      block-lists=?
      (~> ft0
-         (frozen-tetris-spawn 'I)
-         frozen-tetris-playfield
+         (tetrion-spawn 'I)
+         tetrion-playfield
          playfield-blocks)
      (strings->blocks '("...IIII..."
                         ".........."
@@ -178,12 +188,12 @@
   (test-case
       "Spawn piece at specific position"
     (define ft0
-      (~> (new-frozen-tetris #:cols 4 #:rows 10)
-          (frozen-tetris-spawn 'T #:x 0 #:y 0 #:rotation 3)))
+      (~> (new-tetrion #:cols 4 #:rows 10)
+          (tetrion-spawn 'T #:x 0 #:y 0 #:rotation 3)))
 
     (check
      block-lists=?
-     (~> ft0 frozen-tetris-playfield playfield-blocks)
+     (~> ft0 tetrion-playfield playfield-blocks)
      (strings->blocks '(".T.."
                         "TT.."
                         ".T..")))    
@@ -192,35 +202,35 @@
   (test-case
       "Block out: the spawned piece overlaps with locked blocks."
     
-    (define ft-full
+    (define tn-full
       (struct-copy
-       frozen-tetris
-       (new-frozen-tetris #:starting-shape 'O)
+       tetrion
+       (new-tetrion #:starting-shape 'O)
        [locked (playfield-add-blocks (empty-playfield 10 20)
                                      (list (block 5 21 'I)))]))
     (check-exn
      #rx"block out"
-     (λ () (frozen-tetris-spawn ft-full 'L))))
+     (λ () (tetrion-spawn tn-full 'L))))
   )
 
 
 ;; Starting-shape can be either a shape-name,
 ;; #f for null shape,
 ;; or #t for generating a shape
-(define (new-frozen-tetris
+(define (new-tetrion
          #:shape-generator [shape-generator 7-loop-shape-generator]
          #:starting-shape [start-shape (shape-generator)]
          #:cols [cols 10]
          #:rows [rows 20]
          #:locked-blocks [locked-blocks '()])
 
-  (define new-ft
-    (frozen-tetris #f
+  (define new-tn
+    (tetrion #f
                    (playfield-add-blocks (empty-playfield cols rows) locked-blocks)
                    shape-generator))
   (cond
-    [(not start-shape) new-ft]
-    [else (frozen-tetris-spawn new-ft start-shape)]))
+    [(not start-shape) new-tn]
+    [else (tetrion-spawn new-tn start-shape)]))
 
 
 ;; Return the blocks representing a Piece
@@ -245,11 +255,11 @@
                [posn (posn+ posn (piece-posn p))]))
 
 
-; FrozenTetris -> Playfield
-(define (frozen-tetris-playfield ft)
-  (define piece (frozen-tetris-piece ft))
+; Tetrion -> Playfield
+(define (tetrion-playfield tn)
+  (define piece (tetrion-piece tn))
   (playfield-add-blocks
-   (frozen-tetris-locked ft)
+   (tetrion-locked tn)
    (if (not piece) '() (piece-blocks piece))))
 
 
@@ -257,81 +267,81 @@
   (test-case
       "Get playfield immediately after lock, with null Piece"
 
-    (define ft1 (~> (new-frozen-tetris #:starting-shape 'T #:cols 3 #:rows 2)
-                    frozen-tetris-hard-drop
-                    frozen-tetris-lock))
+    (define ft1 (~> (new-tetrion #:starting-shape 'T #:cols 3 #:rows 2)
+                    tetrion-hard-drop
+                    tetrion-lock))
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft1))
+     (playfield-blocks (tetrion-playfield ft1))
      (strings->blocks '(".T."
                         "TTT")))))
 
 
-; FrozenTetris Posn -> FrozenTetris
-(define (frozen-tetris-move ft posn)
-  (define new-piece (piece-move (frozen-tetris-piece ft) posn))
-  (define locked (frozen-tetris-locked ft))
+; Tetrion Posn -> Tetrion
+(define (tetrion-move tn posn)
+  (define new-piece (piece-move (tetrion-piece tn) posn))
+  (define locked (tetrion-locked tn))
   (cond
     [(playfield-can-place? locked (piece-blocks new-piece))
-     (struct-copy frozen-tetris ft
+     (struct-copy tetrion tn
                   [piece new-piece])]
     [else (error "Can't move piece by " posn)]))
 
 
 ;; Rotate cw or ccw,
 ;; Raise exn:fail if can't rotate
-(define (frozen-tetris-rotate ft cw?)
-  (define p (frozen-tetris-piece ft))
+(define (tetrion-rotate tn cw?)
+  (define p (tetrion-piece tn))
   (define shape-name (piece-shape-name p))
   (define rot-initial (piece-rotation p))
   (define rot-final (modulo (+ rot-initial (if cw? 1 -1)) 4))
   (define rotated-p (struct-copy piece p [rotation rot-final]))
-  (define ft-rotated (struct-copy frozen-tetris ft [piece rotated-p]))
-  (define plf (frozen-tetris-playfield ft))
+  (define tn-rotated (struct-copy tetrion tn [piece rotated-p]))
+  (define plf (tetrion-playfield tn))
 
   (define (moved-or-false kick)
     (with-handlers
       ([exn:fail? (λ (e) #f)])
-      (frozen-tetris-move ft-rotated (make-posn (car kick) (cadr kick)))))
+      (tetrion-move tn-rotated (make-posn (car kick) (cadr kick)))))
 
-  (define new-ft
+  (define new-tn
     (for/first ([kick (kick-data shape-name rot-initial rot-final)]
                 #:when (moved-or-false kick))
       (moved-or-false kick)))
 
   (cond
-    [(not new-ft) (error "Can't rotate piece." ft)]
-    [else new-ft]))
+    [(not new-tn) (error "Can't rotate piece." tn)]
+    [else new-tn]))
 
 (module+ test
   (test-case
       "Rotate cw"
-    (define ft0 (new-frozen-tetris #:starting-shape 'L #:cols 4 #:rows 2))
+    (define ft0 (new-tetrion #:starting-shape 'L #:cols 4 #:rows 2))
 
     ;; assert initial setup
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft0))
+     (playfield-blocks (tetrion-playfield ft0))
      (strings->blocks '("..L."
                         "LLL."
                         "...."
                         "....")))
 
-    (define ft1 (frozen-tetris-rotate ft0 #t))
+    (define ft1 (tetrion-rotate ft0 #t))
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft1))
+     (playfield-blocks (tetrion-playfield ft1))
      (strings->blocks '(".L.."
                         ".L.."
                         ".LL."
                         "....")))
 
     (define ft2 (~> ft1
-                   frozen-tetris-left
-                   (frozen-tetris-rotate #t)))
+                   tetrion-left
+                   (tetrion-rotate #t)))
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft2))
+     (playfield-blocks (tetrion-playfield ft2))
      (strings->blocks '("...."
                         "LLL."
                         "L..."
@@ -341,46 +351,46 @@
 
 
 ;; Rotate 180, raise exn:fail if can't
-(define (frozen-tetris-rotate-180 ft)
+(define (tetrion-rotate-180 tn)
   (define (try-rotate-cw ft1)
     (with-handlers ([exn:fail? (λ (e) #f)])
-      (frozen-tetris-rotate ft1 #t)))
+      (tetrion-rotate ft1 #t)))
   (define (try-change-rotation)
-    (define p (frozen-tetris-piece ft))
+    (define p (tetrion-piece tn))
     (define new-rot (modulo (+ 2 (piece-rotation p)) 4))
     (define new-p (struct-copy piece p [rotation new-rot]))
-    (if (playfield-can-place? (frozen-tetris-locked ft) (piece-blocks new-p))
-        (struct-copy frozen-tetris ft [piece new-p])
+    (if (playfield-can-place? (tetrion-locked tn) (piece-blocks new-p))
+        (struct-copy tetrion tn [piece new-p])
         #f))
   (or
    (try-change-rotation)
    ;; try rotating twice clockwise
-   (and~> ft try-rotate-cw try-rotate-cw)
+   (and~> tn try-rotate-cw try-rotate-cw)
    (error "Can't rotate 180.")))
 
 (module+ test
   (test-case
       "Rotate 180 by simply changing the piece rotation."
     (define ft0
-      (~> (new-frozen-tetris
+      (~> (new-tetrion
            #:cols 4 #:rows 10
            #:locked-blocks (strings->blocks '("OO."
                                               "..."
                                               ".OO")))
-          (frozen-tetris-spawn 'L #:x 0 #:y 0 #:rotation 0)))
+          (tetrion-spawn 'L #:x 0 #:y 0 #:rotation 0)))
 
     ;; assert initial setup
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft0))
+     (playfield-blocks (tetrion-playfield ft0))
      (strings->blocks '("OOL"
                         "LLL"
                         ".OO")))
 
-    (define ft-rotated (frozen-tetris-rotate-180 ft0))
+    (define tn-rotated (tetrion-rotate-180 ft0))
     (check
      block-lists=?
-     (~> ft-rotated frozen-tetris-playfield playfield-blocks)
+     (~> tn-rotated tetrion-playfield playfield-blocks)
      (strings->blocks '("OO."
                         "LLL"
                         "LOO")))
@@ -389,12 +399,12 @@
   )
 
 
-; FrozenTetris -> FrozenTetris
+; Tetrion -> Tetrion
 (module+ test
   (test-case
-      "Move the frozen-tetris piece"
+      "Move the tetrion piece"
     (define ft0
-      (new-frozen-tetris #:starting-shape 'I
+      (new-tetrion #:starting-shape 'I
                          #:cols 4
                          #:rows 2
                          #:locked-blocks (strings->blocks '("JJ.."))))
@@ -402,87 +412,87 @@
     ;; check assumption
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft0))
+     (playfield-blocks (tetrion-playfield ft0))
      (strings->blocks '("IIII"
                         "...."
                         "JJ..")))
     
     ;; Successful move
     (define ft0-drop
-      (frozen-tetris-move ft0 (make-posn 0 -1)))
+      (tetrion-move ft0 (make-posn 0 -1)))
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft0-drop))
+     (playfield-blocks (tetrion-playfield ft0-drop))
      (strings->blocks '("IIII"
                         "JJ..")))
 
     ;; Fail on collision with locked blocks
     (check-exn
      exn:fail?
-     (λ () (frozen-tetris-move ft0-drop (make-posn 0 -1))))
+     (λ () (tetrion-move ft0-drop (make-posn 0 -1))))
 
     ;; Fail on collision with bottom of playfield
     (define ft1
-      (new-frozen-tetris #:starting-shape 'L
+      (new-tetrion #:starting-shape 'L
                          #:cols 3
                          #:rows 0))    
     (check-exn
      exn:fail?
-     (λ () (frozen-tetris-move ft1 (make-posn 0 -1))))
+     (λ () (tetrion-move ft1 (make-posn 0 -1))))
 
     ;; Fail on collision with right border    
     (check-exn
      exn:fail?
-     (λ () (frozen-tetris-move ft1 (make-posn 1 0))))
+     (λ () (tetrion-move ft1 (make-posn 1 0))))
 
     ;; Fail on collision with left border    
     (check-exn
      exn:fail?
-     (λ () (frozen-tetris-move ft1 (make-posn -1 0))))
+     (λ () (tetrion-move ft1 (make-posn -1 0))))
     
     ;; Should work on new instance
     (check-not-exn
-     (λ () (frozen-tetris-move (new-frozen-tetris #:starting-shape 'L) (make-posn 0 -1))))
+     (λ () (tetrion-move (new-tetrion #:starting-shape 'L) (make-posn 0 -1))))
     ))
 
 
-(define (frozen-tetris-drop ft)
-  (frozen-tetris-move ft (make-posn 0 -1)))
+(define (tetrion-drop tn)
+  (tetrion-move tn (make-posn 0 -1)))
 
-(define (frozen-tetris-right ft)
-  (frozen-tetris-move ft (make-posn 1 0)))
+(define (tetrion-right tn)
+  (tetrion-move tn (make-posn 1 0)))
 
-(define (frozen-tetris-left ft)
-  (frozen-tetris-move ft (make-posn -1 0)))
+(define (tetrion-left tn)
+  (tetrion-move tn (make-posn -1 0)))
 
 
 ;; Move the Piece as far down as possible
-(define (frozen-tetris-hard-drop ft)
+(define (tetrion-hard-drop tn)
   (define dropped
     (with-handlers ([exn:fail? (λ (e) #f)])
-      (frozen-tetris-drop ft)))
+      (tetrion-drop tn)))
   (if (not dropped)
-      ft
-      (frozen-tetris-hard-drop dropped)))
+      tn
+      (tetrion-hard-drop dropped)))
 
 
 (module+ test
   (test-case
       "Hard drop to the floor"
-    (define ft0 (new-frozen-tetris #:starting-shape 'O #:cols 4 #:rows 2))
+    (define ft0 (new-tetrion #:starting-shape 'O #:cols 4 #:rows 2))
     ;; assert initial setup
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft0))
+     (playfield-blocks (tetrion-playfield ft0))
      (strings->blocks '(".OO."
                         ".OO."
                         "...."
                         "....")))
 
-    (define ft-dropped (frozen-tetris-hard-drop ft0))
+    (define tn-dropped (tetrion-hard-drop ft0))
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft-dropped))
+     (playfield-blocks (tetrion-playfield tn-dropped))
      (strings->blocks '("...."
                         "...."
                         ".OO."
@@ -491,25 +501,25 @@
 
   (test-case
       "Hard drop to a block"
-    (define ft0 (new-frozen-tetris #:starting-shape 'O #:cols 4 #:rows 3))
-    (define plf1 (playfield-add-blocks (frozen-tetris-locked ft0)
+    (define ft0 (new-tetrion #:starting-shape 'O #:cols 4 #:rows 3))
+    (define plf1 (playfield-add-blocks (tetrion-locked ft0)
                                        (strings->blocks '("LL.."))))
-    (define ft1 (struct-copy frozen-tetris ft0 [locked plf1]))
+    (define ft1 (struct-copy tetrion ft0 [locked plf1]))
     
     ;; assert initial setup
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft1))
+     (playfield-blocks (tetrion-playfield ft1))
      (strings->blocks '(".OO."
                         ".OO."
                         "...."
                         "...."
                         "LL..")))
 
-    (define ft-dropped (frozen-tetris-hard-drop ft1))
+    (define tn-dropped (tetrion-hard-drop ft1))
     (check
      block-lists=?
-     (playfield-blocks (frozen-tetris-playfield ft-dropped))
+     (playfield-blocks (tetrion-playfield tn-dropped))
      (strings->blocks '("...."
                         "...."
                         ".OO."
@@ -519,12 +529,12 @@
   )
 
 
-; FrozenTetris -> FrozenTetris
+; Tetrion -> Tetrion
 ; Locks piece (adds the blocks to `locked`) and clears the blueprint (sets Piece to #f)
 ; Raises error on lock out.
-(define (frozen-tetris-lock ft)
-  (define piece (frozen-tetris-piece ft))
-  (define plf-rows (playfield-rows (frozen-tetris-locked ft)))
+(define (tetrion-lock tn)
+  (define piece (tetrion-piece tn))
+  (define plf-rows (playfield-rows (tetrion-locked tn)))
   (define piece-min-y
     (+ (posn-y (piece-posn piece))
        (shape-gap-below (piece-shape-name piece))))
@@ -533,11 +543,11 @@
      (error "All piece blocks above ceiling: lock out")]
     [else
      (define new-locked
-       (~> ft
-           frozen-tetris-piece
+       (~> tn
+           tetrion-piece
            piece-blocks
-           (playfield-add-blocks (frozen-tetris-locked ft) _)))
-     (struct-copy frozen-tetris ft
+           (playfield-add-blocks (tetrion-locked tn) _)))
+     (struct-copy tetrion tn
                   [locked new-locked]
                   [piece #f])]))
 
@@ -545,20 +555,20 @@
 (module+ test
   (test-case
       "Lock out if locked right after spawn (since pieces spawn above the ceiling)"    
-    (define ft0 (new-frozen-tetris #:starting-shape 'L))
+    (define ft0 (new-tetrion #:starting-shape 'L))
     (check-exn
      #rx"lock out"
-     (λ () (frozen-tetris-lock ft0))))
+     (λ () (tetrion-lock ft0))))
 
   
   (test-case
       "No lock out if at least a single block below ceiling"
-    (define ft-dropped
-      (~> (new-frozen-tetris #:starting-shape 'O)
-          frozen-tetris-drop
+    (define tn-dropped
+      (~> (new-tetrion #:starting-shape 'O)
+          tetrion-drop
           ; move it out of the way
-          frozen-tetris-right
-          frozen-tetris-right
-          frozen-tetris-right))
+          tetrion-right
+          tetrion-right
+          tetrion-right))
     (check-not-exn
-     (λ () (frozen-tetris-lock ft-dropped)))))
+     (λ () (tetrion-lock tn-dropped)))))

@@ -6,13 +6,13 @@
 (require racket/contract)
 (require "playfield.rkt")
 (require "block.rkt")
-(require "frozen-tetris.rkt")
+(require "tetrion.rkt")
 (require "tetris.rkt")
 
 (provide
  (contract-out
   [draw-playfield (-> playfield? image?)]
-  [draw-frozen-tetris (-> frozen-tetris? image?)]
+  [draw-tetrion (-> tetrion? image?)]
   [draw-tetris (-> tetris? image?)]
   ))
 
@@ -139,20 +139,20 @@
       (draw-playfield)))
 
 
-(define (draw-frozen-tetris ft)
-  (draw-playfield (frozen-tetris-playfield ft)))
+(define (draw-tetrion tn)
+  (draw-playfield (tetrion-playfield tn)))
 
 
 (module+ test
-  (displayln "Drawing a new FrozenTetris")
-  (define ft0 (new-frozen-tetris #:starting-shape 'L))
-  (define ft-drop1 (frozen-tetris-drop ft0))
-  (define ft-drop2 (frozen-tetris-drop ft-drop1))
-  (define ft-drop3 (frozen-tetris-drop ft-drop2))
-  (beside (~> ft0 frozen-tetris-playfield draw-playfield)
-          (~> ft-drop1 draw-frozen-tetris)
-          (~> ft-drop2 draw-frozen-tetris)
-          (~> ft-drop3 draw-frozen-tetris)))
+  (displayln "Drawing a new Tetrion")
+  (define ft0 (new-tetrion #:starting-shape 'L))
+  (define tn-drop1 (tetrion-drop ft0))
+  (define tn-drop2 (tetrion-drop tn-drop1))
+  (define tn-drop3 (tetrion-drop tn-drop2))
+  (beside (~> ft0 tetrion-playfield draw-playfield)
+          (~> tn-drop1 draw-tetrion)
+          (~> tn-drop2 draw-tetrion)
+          (~> tn-drop3 draw-tetrion)))
 
 (define (draw-tetris t)
-  (draw-frozen-tetris (tetris-ft t)))
+  (draw-tetrion (tetris-tn t)))

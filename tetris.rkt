@@ -19,9 +19,9 @@
  (contract-out
   [tetris? (-> any/c boolean?)]
   [new-tetris (->* (natural-number/c)
-                   (#:frozen-tetris frozen-tetris?)
+                   (#:tetrion tetrion?)
                    tetris?)]
-  [tetris-ft (-> tetris? frozen-tetris?)]
+  [tetris-tn (-> tetris? tetrion?)]
 
   ;; Player actions
   [tetris-left-pressed (-> tetris? natural-number/c tetris?)]
@@ -45,7 +45,7 @@
 
 
 (require threading)
-(require "frozen-tetris.rkt")
+(require "tetrion.rkt")
 (require "playfield.rkt")
 (require "block.rkt")
 (require "utils.rkt")
@@ -56,11 +56,11 @@
 
 
 ;; A Tetris is a struct:
-;;   - ft: FrozenTetris
+;;   - tn: Tetrion
 ;;   - t-drop: last time the piece was dropped due to gravity
 ;;   - t-dirn: last time when the piece started moving
 ;;             (when both direction had been depressed, and one of them was pressed)
-(struct tetris [ft pressed-hash t-drop t-dirn t-autoshift])
+(struct tetris [tn pressed-hash t-drop t-dirn t-autoshift])
 
 
 ; -------------------------------
@@ -74,8 +74,8 @@
 
 
 (define (new-tetris ms
-                    #:frozen-tetris [frozen-tetris (new-frozen-tetris)])
-  (~> (tetris frozen-tetris (hash) ms 0 0)
+                    #:tetrion [tetrion (new-tetrion)])
+  (~> (tetris tetrion (hash) ms 0 0)
       (tetris-spawn ms)))
 
 
@@ -96,15 +96,15 @@
   (cdr (hash-ref h k (cons #f 0))))
 
 
-;; call frozen-tetris-move and update the lock timer if successful move
+;; call tetrion-move and update the lock timer if successful move
 (define (tetris--move t ms dirn)
-  (define ft (tetris-ft t))
-  (define new-ft
-    (with-handlers ([exn:fail? (λ (e) ft)])
+  (define tn (tetris-tn t))
+  (define new-tn
+    (with-handlers ([exn:fail? (λ (e) tn)])
       (if (equal? dirn 'right)
-          (frozen-tetris-right ft)
-          (frozen-tetris-left ft))))
-  (struct-copy tetris t [ft new-ft]))
+          (tetrion-right tn)
+          (tetrion-left tn))))
+  (struct-copy tetris t [tn new-tn]))
 
 
 ; dirn is either 'left or 'right
@@ -146,12 +146,12 @@
 ;; simply drop the piece,
 ;; and update the t-on-ground
 (define (tetris--drop t)
-  (define ft (tetris-ft t))
-  (define new-ft
-    (with-handlers ([exn:fail? (λ (e) ft)])
-      (frozen-tetris-drop ft)))
+  (define tn (tetris-tn t))
+  (define new-tn
+    (with-handlers ([exn:fail? (λ (e) tn)])
+      (tetrion-drop tn)))
   (struct-copy tetris t
-               [ft new-ft]))
+               [tn new-tn]))
 
 
 ;; Apply gravity or soft-drop if it's time to and "down" is being held.
@@ -177,7 +177,7 @@
   (define t0
     (new-tetris
      0
-     #:frozen-tetris (new-frozen-tetris
+     #:tetrion (new-tetrion
                       #:starting-shape 'L
                       #:rows 2)))
 
@@ -185,8 +185,8 @@
   (check                       
    block-lists=?
    (~> t0
-       tetris-ft
-       frozen-tetris-playfield
+       tetris-tn
+       tetrion-playfield
        playfield-blocks)
    (strings->blocks '(".....L...."
                       "...LLL...."
@@ -200,8 +200,8 @@
     (check
      block-lists=?
      (~> t1
-         tetris-ft
-         frozen-tetris-playfield
+         tetris-tn
+         tetrion-playfield
          playfield-blocks)
      (strings->blocks '(".........."
                         ".....L...."
@@ -218,8 +218,8 @@
     (check
      block-lists=?
      (~> t2
-         tetris-ft
-         frozen-tetris-playfield
+         tetris-tn
+         tetrion-playfield
          playfield-blocks)
      (strings->blocks '(".........."
                         ".........."
@@ -235,8 +235,8 @@
     (check
      block-lists=?
      (~> t3
-         tetris-ft
-         frozen-tetris-playfield
+         tetris-tn
+         tetrion-playfield
          playfield-blocks)
      (strings->blocks '(".....L...."
                         "...LLL...."
@@ -249,32 +249,32 @@
 
 
 (define (tetris-spawn t ms [shape-name #f])
-  (define ft (tetris-ft t))
-  (define new-ft (if shape-name
-                     (frozen-tetris-spawn ft shape-name)
-                     (frozen-tetris-spawn ft)))
-  (struct-copy tetris t [ft new-ft] [t-drop ms]))
+  (define tn (tetris-tn t))
+  (define new-tn (if shape-name
+                     (tetrion-spawn tn shape-name)
+                     (tetrion-spawn tn)))
+  (struct-copy tetris t [tn new-tn] [t-drop ms]))
 
 
 (define (tetris-lock t ms)
-  (define ft-locked (~> (tetris-ft t)
-                        frozen-tetris-lock))
-  (~> (struct-copy tetris t [ft ft-locked])
+  (define tn-locked (~> (tetris-tn t)
+                        tetrion-lock))
+  (~> (struct-copy tetris t [tn tn-locked])
       (tetris-spawn ms)))
 
 
 (define (tetris-hard-drop t ms)
-  (define ft-dropped (~> (tetris-ft t)
-                         frozen-tetris-hard-drop))
-  (~> (struct-copy tetris t [ft ft-dropped])
+  (define tn-dropped (~> (tetris-tn t)
+                         tetrion-hard-drop))
+  (~> (struct-copy tetris t [tn tn-dropped])
       (tetris-lock ms)))
 
 
 (define (tetris--rotate t cw? ms)
-  (define new-ft
-    (with-handlers ([exn:fail? (λ (e) (tetris-ft t))])
-      (frozen-tetris-rotate (tetris-ft t) cw?)))
-  (struct-copy tetris t [ft new-ft]))
+  (define new-tn
+    (with-handlers ([exn:fail? (λ (e) (tetris-tn t))])
+      (tetrion-rotate (tetris-tn t) cw?)))
+  (struct-copy tetris t [tn new-tn]))
 
 
 (define (tetris-rotate-cw t ms)
@@ -285,10 +285,10 @@
 
 
 (define (tetris-rotate-180 t ms)
-  (define new-ft
-    (with-handlers ([exn:fail? (λ (e) (tetris-ft t))])
-      (frozen-tetris-rotate-180 (tetris-ft t))))
-  (struct-copy tetris t [ft new-ft]))
+  (define new-tn
+    (with-handlers ([exn:fail? (λ (e) (tetris-tn t))])
+      (tetrion-rotate-180 (tetris-tn t))))
+  (struct-copy tetris t [tn new-tn]))
 
 
 ;; Move in dirn if enough time has passed since previous move
