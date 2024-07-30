@@ -10,8 +10,8 @@
                    (#:frozen-tetris frozen-tetris?)
                    tetris?)]
   [tetris-ft (-> tetris? frozen-tetris?)]
-  [tetris-pressed-left (-> tetris? natural-number/c tetris?)]
-  [tetris-pressed-right (-> tetris? natural-number/c tetris?)]
+  [tetris-left-pressed (-> tetris? natural-number/c tetris?)]
+  [tetris-right-pressed (-> tetris? natural-number/c tetris?)]
   [tetris-rotate-cw (-> tetris? natural-number/c tetris?)]
   [tetris-rotate-ccw (-> tetris? natural-number/c tetris?)]  
   [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
@@ -61,7 +61,7 @@
       (tetris-spawn ms)))
 
 
-(define (tetris-pressed-left t ms)
+(define (tetris-left-pressed t ms)
   (define ft (tetris-ft t))
   (define new-ft
     (with-handlers ([exn:fail? (λ (e) ft)])
@@ -70,7 +70,7 @@
                [ft new-ft]) )
 
 
-(define (tetris-pressed-right t ms)
+(define (tetris-right-pressed t ms)
   (define ft (tetris-ft t))
   (define new-ft
     (with-handlers ([exn:fail? (λ (e) ft)])
