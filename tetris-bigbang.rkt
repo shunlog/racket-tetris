@@ -17,6 +17,29 @@
       inexact->exact))
 
 
+(define key-pressed-hash (make-hash))
+
+
+(define (on-key-filtered ws k f ms)
+  (define pressed? (hash-ref key-pressed-hash k #f))
+  (cond
+    [pressed? ws]
+    [else
+     (hash-set! key-pressed-hash k #t)
+     (f ws k ms)]))
+
+
+(define (on-release-filtered ws k f ms)
+  ;; Although pressed? will never be false in normal conditions,
+  ;; I'll handle that just in case
+  (define pressed? (hash-ref key-pressed-hash k #f))
+  (cond
+    [pressed?
+     (hash-set! key-pressed-hash k #f)
+     (f ws k ms)]
+    [else ws]))
+
+
 (define (tetris-on-key t k ms)
   (cond
     [(key=? k "left") (tetris-pressed-left t ms)]
@@ -27,10 +50,16 @@
     [else t]))
 
 
+(define (tetris-on-release t k ms)
+  (cond
+    [else t]))
+
+
 (define (tetris-run)
   (big-bang (new-tetris (millis))
-            [on-tick (λ (t) (tetris-on-tick t (millis)))]
-            [on-key (λ (t k) (tetris-on-key t k (millis)))]
+            [on-tick (λ (ws) (tetris-on-tick ws (millis)))]
+            [on-key (λ (ws k) (on-key-filtered ws k tetris-on-key (millis)))]
+            [on-release (λ (ws k) (on-release-filtered ws k tetris-on-release (millis)))]
             [to-draw
-             (λ (t)
-               (draw-tetris t))]))
+             (λ (ws)
+               (draw-tetris ws))]))
