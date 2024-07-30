@@ -31,7 +31,8 @@
   [tetris-soft-drop-pressed (-> tetris? natural-number/c tetris?)]
   [tetris-soft-drop-released (-> tetris? natural-number/c tetris?)]
   [tetris-rotate-cw (-> tetris? natural-number/c tetris?)]
-  [tetris-rotate-ccw (-> tetris? natural-number/c tetris?)]  
+  [tetris-rotate-ccw (-> tetris? natural-number/c tetris?)]
+  [tetris-rotate-180 (-> tetris? natural-number/c tetris?)]  
   [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
 
   ;; Big bang on-tick
@@ -281,6 +282,13 @@
 
 (define (tetris-rotate-ccw t ms)
   (tetris--rotate t #f ms))
+
+
+(define (tetris-rotate-180 t ms)
+  (define new-ft
+    (with-handlers ([exn:fail? (λ (e) (tetris-ft t))])
+      (frozen-tetris-rotate-180 (tetris-ft t))))
+  (struct-copy tetris t [ft new-ft]))
 
 
 ;; Move in dirn if enough time has passed since previous move

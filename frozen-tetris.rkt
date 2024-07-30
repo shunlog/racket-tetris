@@ -52,6 +52,7 @@
   [frozen-tetris-right (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-left (-> frozen-tetris? frozen-tetris?)]
   [frozen-tetris-rotate (-> frozen-tetris? boolean? frozen-tetris?)]
+  [frozen-tetris-rotate-180 (-> frozen-tetris? frozen-tetris?)]
 
   ;; Other
   [frozen-tetris-lock (-> frozen-tetris? frozen-tetris?)]
@@ -206,21 +207,19 @@
 ;; Starting-shape can be either a shape-name,
 ;; #f for null shape,
 ;; or #t for generating a shape
-(define (new-frozen-tetris #:starting-shape [start-shape #t]
-                           #:shape-generator [shape-generator 7-loop-shape-generator]
-                           #:cols [cols 10]
-                           #:rows [rows 20]
-                           #:locked-blocks [locked-blocks '()])
-  
+(define (new-frozen-tetris
+         #:shape-generator [shape-generator 7-loop-shape-generator]
+         #:starting-shape [start-shape (shape-generator)]
+         #:cols [cols 10]
+         #:rows [rows 20]
+         #:locked-blocks [locked-blocks '()])
+
   (define new-ft
     (frozen-tetris #f
                    (playfield-add-blocks (empty-playfield cols rows) locked-blocks)
                    shape-generator))
   (cond
-    [(equal? #t start-shape)
-     (frozen-tetris-spawn new-ft (shape-generator))]
-    [(not start-shape)
-     new-ft]
+    [(not start-shape) new-ft]
     [else (frozen-tetris-spawn new-ft start-shape)]))
 
 
@@ -279,6 +278,8 @@
     [else (error "Can't move piece by " posn)]))
 
 
+;; Rotate cw or ccw,
+;; Raise exn:fail if can't rotate
 (define (frozen-tetris-rotate ft cw?)
   (define p (frozen-tetris-piece ft))
   (define shape-name (piece-shape-name p))
@@ -335,7 +336,57 @@
                         "LLL."
                         "L..."
                         "....")))
-    ))
+    )
+)
+
+
+;; Rotate 180, raise exn:fail if can't
+(define (frozen-tetris-rotate-180 ft)
+  (define (try-rotate-cw ft1)
+    (with-handlers ([exn:fail? (λ (e) #f)])
+      (frozen-tetris-rotate ft1 #t)))
+  (define (try-change-rotation)
+    (define p (frozen-tetris-piece ft))
+    (define new-rot (modulo (+ 2 (piece-rotation p)) 4))
+    (define new-p (struct-copy piece p [rotation new-rot]))
+    (if (playfield-can-place? (frozen-tetris-locked ft) (piece-blocks new-p))
+        (struct-copy frozen-tetris ft [piece new-p])
+        #f))
+  (or
+   (try-change-rotation)
+   ;; try rotating twice clockwise
+   (and~> ft try-rotate-cw try-rotate-cw)
+   (error "Can't rotate 180.")))
+
+(module+ test
+  (test-case
+      "Rotate 180 by simply changing the piece rotation."
+    (define ft0
+      (~> (new-frozen-tetris
+           #:cols 4 #:rows 10
+           #:locked-blocks (strings->blocks '("OO."
+                                              "..."
+                                              ".OO")))
+          (frozen-tetris-spawn 'L #:x 0 #:y 0 #:rotation 0)))
+
+    ;; assert initial setup
+    (check
+     block-lists=?
+     (playfield-blocks (frozen-tetris-playfield ft0))
+     (strings->blocks '("OOL"
+                        "LLL"
+                        ".OO")))
+
+    (define ft-rotated (frozen-tetris-rotate-180 ft0))
+    (check
+     block-lists=?
+     (~> ft-rotated frozen-tetris-playfield playfield-blocks)
+     (strings->blocks '("OO."
+                        "LLL"
+                        "LOO")))
+    
+    )
+  )
 
 
 ; FrozenTetris -> FrozenTetris
