@@ -270,9 +270,10 @@
 
 
 (define (tetris--rotate t cw? ms)
-  (define new-ft (frozen-tetris-rotate (tetris-ft t) cw?))
-  (struct-copy tetris t
-               [ft new-ft]))
+  (define new-ft
+    (with-handlers ([exn:fail? (λ (e) (tetris-ft t))])
+      (frozen-tetris-rotate (tetris-ft t) cw?)))
+  (struct-copy tetris t [ft new-ft]))
 
 
 (define (tetris-rotate-cw t ms)
