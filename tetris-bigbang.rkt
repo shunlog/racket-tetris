@@ -30,6 +30,8 @@
 
 (define (tetris-on-release t k ms)
   (cond
+    [(key=? k "left") (tetris-left-released t ms)]
+    [(key=? k "right") (tetris-right-released t ms)]
     [else t]))
 
 

@@ -10,11 +10,17 @@
                    (#:frozen-tetris frozen-tetris?)
                    tetris?)]
   [tetris-ft (-> tetris? frozen-tetris?)]
+
+  ;; Movement
   [tetris-left-pressed (-> tetris? natural-number/c tetris?)]
+  [tetris-left-released (-> tetris? natural-number/c tetris?)]
   [tetris-right-pressed (-> tetris? natural-number/c tetris?)]
+  [tetris-right-released (-> tetris? natural-number/c tetris?)]
   [tetris-rotate-cw (-> tetris? natural-number/c tetris?)]
   [tetris-rotate-ccw (-> tetris? natural-number/c tetris?)]  
   [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
+
+  ;; Others
   [tetris-on-tick (-> tetris? natural-number/c tetris?)]
   ))
 
@@ -33,7 +39,8 @@
 ;; -------------------------------
 ;; Constants
 
-(define MS/DROP (inexact->exact (floor 1000))) ; ms before we drop due to gravity
+(define MS/DROP 1000)               ; ms before we drop due to gravity
+(define AUTOSHIFT 200)              ; ms before autoshift starts
 
 
 ;; ----------------------------
@@ -42,7 +49,10 @@
 
 ;; A Tetris is a struct:
 ;;   - ft: FrozenTetris
-(struct tetris [ft t-drop])
+;;   - t-drop: last time the piece was dropped due to gravity
+;;   - t-dirn: last time when the piece started moving
+;;             (when both direction had been depressed, and one of them was pressed)
+(struct tetris [ft pressed-hash t-drop t-dirn])
 
 
 ; -------------------------------
@@ -57,26 +67,61 @@
 
 (define (new-tetris ms
                     #:frozen-tetris [frozen-tetris (new-frozen-tetris)])
-  (~> (tetris frozen-tetris ms)
+  (~> (tetris frozen-tetris (hash) ms 0)
       (tetris-spawn ms)))
 
 
-(define (tetris-left-pressed t ms)
+;; Set the state and time of the last key press/release
+(define (tetris--set-pressed t k ms pressed?)
+  (define h (tetris-pressed-hash t))
+  (define new-h (hash-set h k (cons pressed? ms)))
+  (struct-copy tetris t [pressed-hash new-h]))
+
+;; Return #t if key is pressed, otherwise #f
+(define (tetris--pressed? t k)
+  (define h (tetris-pressed-hash t))
+  (car (hash-ref h k (cons #f 0))))
+
+;; Return the time when key was last pressed/released
+(define (tetris--pressed-t t k)
+  (define h (tetris-pressed-hash t))
+  (cdr (hash-ref h k (cons #f 0))))
+
+
+;; call frozen-tetris-move and update the lock timer if successful move
+(define (tetris--move t ms dirn)
   (define ft (tetris-ft t))
   (define new-ft
     (with-handlers ([exn:fail? (λ (e) ft)])
-      (frozen-tetris-left ft)))
-  (struct-copy tetris t
-               [ft new-ft]) )
+      (if (equal? dirn 'right)
+          (frozen-tetris-right ft)
+          (frozen-tetris-left ft))))
+  (struct-copy tetris t [ft new-ft]))
 
+
+; dirn is either 'left or 'right
+(define (tetris--dirn-pressed t ms dirn)
+  (define other-dirn (if (equal? dirn 'right) 'left 'right))
+  (define new-t-dirn (if (tetris--pressed? t other-dirn)
+                         (tetris-t-dirn t)
+                         ms))
+  (~> t
+      (tetris--move ms dirn)
+      (tetris--set-pressed dirn ms #t)
+      (struct-copy tetris _
+                   [t-dirn new-t-dirn])))
 
 (define (tetris-right-pressed t ms)
-  (define ft (tetris-ft t))
-  (define new-ft
-    (with-handlers ([exn:fail? (λ (e) ft)])
-      (frozen-tetris-right ft)))
-  (struct-copy tetris t
-               [ft new-ft]))
+  (tetris--dirn-pressed t ms 'right))
+
+(define (tetris-left-pressed t ms)
+  (tetris--dirn-pressed t ms 'left))
+
+(define (tetris-right-released t ms)
+  (tetris--set-pressed t 'right ms #f))
+
+(define (tetris-left-released t ms)
+  (tetris--set-pressed t 'left ms #f))
 
 
 ;; Tetris -> Tetris
@@ -91,7 +136,7 @@
                [ft new-ft]))
 
 
-;; Apply gravity or soft-drop if "down" is being held.
+;; Apply gravity or soft-drop if it's time to and "down" is being held.
 (define (tetris-gravity-tick t ms)
   (define t-drop (tetris-t-drop t))
   (define times-to-drop (quotient (- ms t-drop) MS/DROP))
@@ -216,10 +261,25 @@
   (tetris--rotate t #f ms))
 
 
+;; Apply autoshift if it's time to and a direction key is being held
+(define (tetris-autoshift-tick t ms)
+  (define right (tetris--pressed? t 'right))
+  (define left (tetris--pressed? t 'left))
+  (define autoshift? (and (or right left)
+                          (> (- ms (tetris-t-dirn t)) AUTOSHIFT)))
+  (define right-last (> (tetris--pressed-t t 'right) (tetris--pressed-t t 'left)))
+  
+  (cond
+    [(not autoshift?) t]
+    [(or (not left) (and right right-last)) (tetris--move t ms 'right)]
+    [else (tetris--move t ms 'left)]))
+
+
 ;; Used in big-bang on every tick.
 (define (tetris-on-tick t ms)
   (~> t
-      (tetris-gravity-tick ms)))
+      (tetris-gravity-tick ms)
+      (tetris-autoshift-tick ms)))
 
 
 
