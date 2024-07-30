@@ -116,21 +116,26 @@
 ;; meaning changes the piece "blueprint"
 (define (frozen-tetris-spawn
          ft 
-         [shape-name ((frozen-tetris-shape-generator ft))])
+         [shape-name ((frozen-tetris-shape-generator ft))]
+         #:x [x #f]
+         #:y [y #f]
+         #:rotation [rotation 0])
   (define grid-cols
     (~> ft frozen-tetris-locked playfield-cols))
   (define grid-rows
     (~> ft frozen-tetris-locked playfield-rows))
   (define piece-x
-    (floor (/ (- grid-cols (shape-width shape-name)) 2)))
+    (or x
+        (floor (/ (- grid-cols (shape-width shape-name)) 2))))
 
   ;; the lowest blocks should spawn on the first line of the vanish zone,
   ;; so if there are 20 rows, it should spawn on row with index 20 (0-based)
   (define piece-y
-    (- grid-rows (shape-gap-below shape-name)))
+    (or y
+        (- grid-rows (shape-gap-below shape-name))))
   
   (define new-piece
-    (piece (make-posn piece-x piece-y) shape-name 0))
+    (piece (make-posn piece-x piece-y) shape-name rotation))
   
   (cond
     [(not (playfield-can-place? (frozen-tetris-locked ft)
@@ -168,6 +173,20 @@
      (strings->blocks '("...IIII..."
                         ".........."
                         ".........."))))
+
+  (test-case
+      "Spawn piece at specific position"
+    (define ft0
+      (~> (new-frozen-tetris #:cols 4 #:rows 10)
+          (frozen-tetris-spawn 'T #:x 0 #:y 0 #:rotation 3)))
+
+    (check
+     block-lists=?
+     (~> ft0 frozen-tetris-playfield playfield-blocks)
+     (strings->blocks '(".T.."
+                        "TT.."
+                        ".T..")))    
+    )
   
   (test-case
       "Block out: the spawned piece overlaps with locked blocks."
