@@ -7,9 +7,7 @@
  (contract-out
   [tetris? (-> any/c boolean?)]
   [new-tetris (->* (natural-number/c)
-                   (#:rows natural-number/c
-                    #:cols natural-number/c
-                    #:shape-generator shape-generator?)
+                   (#:frozen-tetris frozen-tetris?)
                    tetris?)]
   [tetris-ft (-> tetris? frozen-tetris?)]
   [tetris-pressed-left (-> tetris? natural-number/c tetris?)]
@@ -44,7 +42,7 @@
 
 ;; A Tetris is a struct:
 ;;   - ft: FrozenTetris
-(struct tetris [ft shape-generator t-drop])
+(struct tetris [ft t-drop])
 
 
 ; -------------------------------
@@ -58,12 +56,8 @@
 
 
 (define (new-tetris ms
-                    #:cols [cols 10]
-                    #:rows [rows 20]
-                    #:shape-generator [shape-generator 7-loop-shape-generator])
-  (define ft (new-frozen-tetris #:cols cols
-                                #:rows rows))
-  (~> (tetris ft shape-generator ms)
+                    #:frozen-tetris [frozen-tetris (new-frozen-tetris)])
+  (~> (tetris frozen-tetris ms)
       (tetris-spawn ms)))
 
 
@@ -113,11 +107,12 @@
 
 
 (module+ test
-  (define t0 (new-tetris
-              0
-              ;; Guarantee that the first shape will be 'L
-              #:shape-generator 7-loop-shape-generator
-              #:rows 2))
+  (define t0
+    (new-tetris
+     0
+     #:frozen-tetris (new-frozen-tetris
+                      #:starting-shape 'L
+                      #:rows 2)))
 
   ;; Assert that we got the expected shape
   (check                       
@@ -186,11 +181,12 @@
   )
 
 
-(define (tetris-spawn t ms                             
-                      #:piece [piece ((tetris-shape-generator t))])
-  (define new-ft (~> (tetris-ft t)
-                     (frozen-tetris-spawn piece)))
-(struct-copy tetris t [ft new-ft] [t-drop ms]))
+(define (tetris-spawn t ms [shape-name #f])
+  (define ft (tetris-ft t))
+  (define new-ft (if shape-name
+                     (frozen-tetris-spawn ft shape-name)
+                     (frozen-tetris-spawn ft)))
+  (struct-copy tetris t [ft new-ft] [t-drop ms]))
 
 
 (define (tetris-lock t ms)

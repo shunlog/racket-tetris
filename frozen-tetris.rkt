@@ -36,9 +36,10 @@
 (provide
  (contract-out
   [new-frozen-tetris (->* ()
-                          (#:starting-shape (or/c shape-name? false/c)
+                          (#:starting-shape (or/c shape-name? boolean?)
                            #:rows natural-number/c
-                           #:cols natural-number/c)
+                           #:cols natural-number/c
+                           #:shape-generator shape-generator?)
                           frozen-tetris?)]
   [frozen-tetris? (-> any/c boolean?)]
 
@@ -54,7 +55,9 @@
 
   ;; Other
   [frozen-tetris-lock (-> frozen-tetris? frozen-tetris?)]
-  [frozen-tetris-spawn (-> frozen-tetris? shape-name? frozen-tetris?)]))
+  [frozen-tetris-spawn (->* (frozen-tetris?)
+                            (shape-name?)
+                            frozen-tetris?)]))
 
 
 ; -------------------------------
@@ -76,7 +79,7 @@
 ; A FrozenTetris is a struct:
 ; - piece: Piece
 ; - locked: Playfield
-(struct frozen-tetris [piece locked])
+(struct frozen-tetris [piece locked shape-generator])
 
 
 ; A Piece is a struct:
@@ -111,7 +114,9 @@
 
 ;; Spawns a given shape,
 ;; meaning changes the piece "blueprint"
-(define (frozen-tetris-spawn ft shape-name)
+(define (frozen-tetris-spawn
+         ft 
+         [shape-name ((frozen-tetris-shape-generator ft))])
   (define grid-cols
     (~> ft frozen-tetris-locked playfield-cols))
   (define grid-rows
@@ -139,8 +144,8 @@
   (test-case
       "Spawn a piece"
     (define ft0
-      (frozen-tetris (piece (make-posn 0 0) 'L 0)
-                     (empty-playfield 10 2)))
+      (new-frozen-tetris #:starting-shape 'L
+                         #:cols 10 #:rows 2))
     ;; Spawn an L on the left
     (check
      block-lists=?
@@ -179,13 +184,25 @@
   )
 
 
-(define (new-frozen-tetris #:starting-shape [start-shape #f]
+;; Starting-shape can be either a shape-name,
+;; #f for null shape,
+;; or #t for generating a shape
+(define (new-frozen-tetris #:starting-shape [start-shape #t]
+                           #:shape-generator [shape-generator 7-loop-shape-generator]
                            #:cols [cols 10]
-                           #:rows [rows 20])
-  (define new-ft (frozen-tetris #f (empty-playfield cols rows)))
-  (if (not start-shape)
-      new-ft
-      (frozen-tetris-spawn new-ft start-shape)))
+                           #:rows [rows 20]
+                           #:locked-blocks [locked-blocks '()])
+  
+  (define new-ft
+    (frozen-tetris #f
+                   (playfield-add-blocks (empty-playfield cols rows) locked-blocks)
+                   shape-generator))
+  (cond
+    [(equal? #t start-shape)
+     (frozen-tetris-spawn new-ft (shape-generator))]
+    [(not start-shape)
+     new-ft]
+    [else (frozen-tetris-spawn new-ft start-shape)]))
 
 
 ;; Return the blocks representing a Piece
@@ -212,41 +229,24 @@
 
 ; FrozenTetris -> Playfield
 (define (frozen-tetris-playfield ft)
-  (define locked (frozen-tetris-locked ft))
   (define piece (frozen-tetris-piece ft))
-  (cond
-    [(not piece) (error "Piece is #f")]
-    [else (playfield-add-blocks
-           locked
-           (piece-blocks piece))]))
+  (playfield-add-blocks
+   (frozen-tetris-locked ft)
+   (if (not piece) '() (piece-blocks piece))))
 
 
 (module+ test
   (test-case
-      "Get all blocks from a FrozenTetris"
+      "Get playfield immediately after lock, with null Piece"
 
-    ;; A Piece and some locked blocks
-    (define plf1
-      (playfield-add-blocks
-       (empty-playfield)
-       (strings->blocks '("JJ."))))
-    (define ft1
-      (frozen-tetris
-       (piece (make-posn 0 0) 'T 0)
-       plf1))
+    (define ft1 (~> (new-frozen-tetris #:starting-shape 'T #:cols 3 #:rows 2)
+                    frozen-tetris-hard-drop
+                    frozen-tetris-lock))
     (check
      block-lists=?
      (playfield-blocks (frozen-tetris-playfield ft1))
-     (playfield-blocks (playfield-add-blocks
-                        plf1
-                        (strings->blocks '(".T."
-                                           "TTT"
-                                           "..."))))))
-  (test-case
-      "Error if null Piece"
-    (check-exn
-     exn:fail?
-     (λ () (frozen-tetris-playfield (frozen-tetris #f (empty-playfield 3 3)))))))
+     (strings->blocks '(".T."
+                        "TTT")))))
 
 
 ; FrozenTetris Posn -> FrozenTetris
@@ -324,11 +324,19 @@
   (test-case
       "Move the frozen-tetris piece"
     (define ft0
-      (frozen-tetris
-       (piece (make-posn 0 0) 'I 0)
-       (~> (empty-playfield 4 3)
-           (playfield-add-blocks (strings->blocks '("JJ.."))))))
+      (new-frozen-tetris #:starting-shape 'I
+                         #:cols 4
+                         #:rows 2
+                         #:locked-blocks (strings->blocks '("JJ.."))))
 
+    ;; check assumption
+    (check
+     block-lists=?
+     (playfield-blocks (frozen-tetris-playfield ft0))
+     (strings->blocks '("IIII"
+                        "...."
+                        "JJ..")))
+    
     ;; Successful move
     (define ft0-drop
       (frozen-tetris-move ft0 (make-posn 0 -1)))
@@ -345,9 +353,9 @@
 
     ;; Fail on collision with bottom of playfield
     (define ft1
-      (frozen-tetris
-       (piece (make-posn 0 -1) 'L 0)
-       (empty-playfield 3 3)))    
+      (new-frozen-tetris #:starting-shape 'L
+                         #:cols 3
+                         #:rows 0))    
     (check-exn
      exn:fail?
      (λ () (frozen-tetris-move ft1 (make-posn 0 -1))))
