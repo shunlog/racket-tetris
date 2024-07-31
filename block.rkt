@@ -8,12 +8,12 @@
  (contract-out
   [struct block ((x natural-number/c)
                  (y natural-number/c)
-                 (type block-type?))]
-  [BLOCK-TYPES (listof symbol?)]
+                 (type block-type?)
+                 (ghost boolean?))]
   [strings->blocks (-> (listof (λ (s)
-                                   (for/and ([ch s])
-                                     (member (string->symbol (string ch))
-                                             (cons '|.| BLOCK-TYPES)))))
+                                 (for/and ([ch s])
+                                   (or (shape-name? (string->symbol (string ch)))
+                                       (equal? ch #\.)))))
                        (listof block?))]
   [block-move (-> block? posn? block?)]))
 
@@ -30,16 +30,17 @@
 ;; ----------------------------
 ;; Definitions
 
-; A BlockType is either a ShapeName or one of '(ghost garbage)
-(define BLOCK-TYPES
-  (append SHAPE-NAMES '(ghost garbage)))
+
+; A Block is a struct:
+; - x, y are coordinates in the Playfield
+; - ghost is a Boolean
+; - type is either a ShapeName or 'garbage
+(struct block [x y type ghost]
+  #:transparent)
 
 (define (block-type? t)
-  (member t BLOCK-TYPES))
-
-
-(struct block [x y type]
-  #:transparent)
+  (or (shape-name? t)
+      (equal? t 'garbage)))
 
 
 ; -------------------------------
@@ -64,7 +65,7 @@
             (for/list ([ch s]
                        [x (in-naturals)]
                        #:unless (equal? #\. ch))
-              (block x y (string->symbol (string ch)))))))
+              (block x y (string->symbol (string ch)) #f)))))
 
 (module+ test
   (test-case
@@ -75,13 +76,13 @@
         ".LIO")))
    (define expected
      (list
-      (block 1 0 'L)
-      (block 2 0 'I)
-      (block 3 0 'O)
-      (block 0 1 'L)
-      (block 1 1 'J)
-      (block 2 1 'S)
-      (block 4 1 'O)))
+      (block 1 0 'L #f)
+      (block 2 0 'I #f)
+      (block 3 0 'O #f)
+      (block 0 1 'L #f)
+      (block 1 1 'J #f)
+      (block 2 1 'S #f)
+      (block 4 1 'O #f)))
    (for ([b blocks])
      (check-not-false
       (member b expected)
@@ -104,11 +105,11 @@
       "block-move: add Posn to Block"
     ;; Works fine
     (check-equal?
-     (block-move (block 1 1 'L) (make-posn 2 -1))
-     (block 3 0 'L))
+     (block-move (block 1 1 'L #f) (make-posn 2 -1))
+     (block 3 0 'L #f))
 
     ;; Error if pos is negative
     (check-exn
      exn:fail?
-     (λ () (block-move (block 0 0 'L) (make-posn -1 0))))
+     (λ () (block-move (block 0 0 'L #f) (make-posn -1 0))))
     ))

@@ -68,7 +68,7 @@
 (define (playfield-blocks p)
   (define hash (playfield-block-hash p))
   (define (key-val-to-block k v)
-    (block (car k) (cadr k) v))
+    (struct-copy block v [x (car k)] [y (cadr k)]))
   (hash-map hash key-val-to-block))
 
 
@@ -110,20 +110,20 @@
 
     ;; Can place above ceiling (vanish zone
     (check-true
-     (playfield-can-place? plf0 (block 1 4 'L)))
+     (playfield-can-place? plf0 (block 1 4 'L #f)))
     
     ;; Collides with block
-    (define plf1 (playfield-add-block plf0 (block 1 1 'L)))
+    (define plf1 (playfield-add-block plf0 (block 1 1 'L #f)))
     (check-false
-     (playfield-can-place? plf1 (block 1 1 'J)))
+     (playfield-can-place? plf1 (block 1 1 'J #f)))
     
     ;; Out of bounds
     (check-false
-     (playfield-can-place? plf0 (block 3 0 'J)))
+     (playfield-can-place? plf0 (block 3 0 'J #f)))
 
     ;; Works on lists too
     (check-false
-     (playfield-can-place? plf1 (list (block 0 0 'J) (block 1 1 'L))))
+     (playfield-can-place? plf1 (list (block 0 0 'J #f) (block 1 1 'L #f))))
     ))
 
 
@@ -136,10 +136,8 @@
     [(not (playfield-can-place? p block))
      (error "Can't place block at position " (list x y))]
     [else
-     (define btype (block-type block))
-
      (define new-hash
-       (hash-set hash `(,x ,y) btype))
+       (hash-set hash `(,x ,y) block))
      (struct-copy playfield p
                   [block-hash new-hash])]))
 
@@ -150,23 +148,23 @@
     (define pl0 (empty-playfield 10 20))
 
     ; Add a single block
-    (define pl1 (playfield-add-block pl0 (block 1 1 'L)))
+    (define pl1 (playfield-add-block pl0 (block 1 1 'L #f)))
     (check-equal?
      (playfield-blocks pl1)
-     (list (block 1 1 'L)))
+     (list (block 1 1 'L #f)))
 
     ; Add two blocks
     (define pl2 (playfield-add-block
-                 (playfield-add-block pl0 (block 1 1 'L))
-                 (block 1 2 'J)))
+                 (playfield-add-block pl0 (block 1 1 'L #f))
+                 (block 1 2 'J #f)))
     (check-true (block-lists=? (playfield-blocks pl2)
-                    (list (block 1 1 'L) (block 1 2 'J))))
+                    (list (block 1 1 'L #f) (block 1 2 'J #f))))
     
     ;; Expect error when thereis a blocks at given position already
-    (define pl3 (playfield-add-block pl0 (block 1 1 'L)))
+    (define pl3 (playfield-add-block pl0 (block 1 1 'L #f)))
     (check-exn
      #rx"position.*1.*1"
-     (λ () (playfield-add-block pl3 (block 1 1 'J))))
+     (λ () (playfield-add-block pl3 (block 1 1 'J #f))))
     ))
 
 
@@ -181,8 +179,8 @@
     (define pl0 (empty-playfield 10 20))
     
     ; Add list of blocks
-    (define bl1 (list (block 0 1 'J)
-                      (block 1 2 'S)))
+    (define bl1 (list (block 0 1 'J #f)
+                      (block 1 2 'S #f)))
     (define pl2 (playfield-add-blocks pl0 bl1))
     (check-true
      (block-lists=? (playfield-blocks pl2) bl1))
@@ -190,8 +188,8 @@
     ;; Error if any block fails to be added (so none will be added)
     (check-exn
      #rx"position.*1.*2"
-     (λ () (playfield-add-blocks pl0 (list (block 1 2 'L)
-                                           (block 1 2 'J)))))
+     (λ () (playfield-add-blocks pl0 (list (block 1 2 'L #f)
+                                           (block 1 2 'J #f)))))
     ))
 
 

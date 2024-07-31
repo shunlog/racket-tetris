@@ -19,7 +19,9 @@
  (contract-out
   [tetris? (-> any/c boolean?)]
   [new-tetris (->* (natural-number/c)
-                   (#:tetrion tetrion?)
+                   (#:tetrion tetrion?
+                    #:rows natural-number/c
+                    #:cols natural-number/c)
                    tetris?)]
   [tetris-tn (-> tetris? tetrion?)]
 
@@ -74,7 +76,9 @@
 
 
 (define (new-tetris ms
-                    #:tetrion [tetrion (new-tetrion)])
+                    #:rows [rows 20]
+                    #:cols [cols 10]
+                    #:tetrion [tetrion (new-tetrion #:rows rows #:cols cols)])
   (~> (tetris tetrion (hash) ms 0 0)
       (tetris-spawn ms)))
 

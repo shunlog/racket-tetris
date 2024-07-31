@@ -44,11 +44,12 @@
 (provide
  (contract-out
   [new-tetrion (->* ()
-                          (#:starting-shape (or/c shape-name? boolean?)
-                           #:rows natural-number/c
-                           #:cols natural-number/c
-                           #:shape-generator shape-generator?)
-                          tetrion?)]
+                    (#:starting-shape (or/c shape-name? boolean?)
+                     #:rows natural-number/c
+                     #:cols natural-number/c
+                     #:shape-generator shape-generator?
+                     #:locked-blocks (listof block?))
+                    tetrion?)]
   [tetrion? (-> any/c boolean?)]
 
   ;; Accessors
@@ -65,8 +66,8 @@
   ;; Other
   [tetrion-lock (-> tetrion? tetrion?)]
   [tetrion-spawn (->* (tetrion?)
-                            (shape-name?)
-                            tetrion?)]))
+                      (shape-name?)
+                      tetrion?)]))
 
 
 ; -------------------------------
@@ -93,7 +94,7 @@
 
 ; A Piece is a struct:
 ; - posn: Posn
-; - shape-name: one of shape-names
+; - shape-name: shape-name?
 
 ;; Think of the Piece as a "blueprint" instead of actual blocks,
 ;; visualize it as a lump of faded blocks that you can move around.
@@ -207,7 +208,7 @@
        tetrion
        (new-tetrion #:starting-shape 'O)
        [locked (playfield-add-blocks (empty-playfield 10 20)
-                                     (list (block 5 21 'I)))]))
+                                     (list (block 5 21 'I #f)))]))
     (check-exn
      #rx"block out"
      (λ () (tetrion-spawn tn-full 'L))))

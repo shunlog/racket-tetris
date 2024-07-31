@@ -5,7 +5,7 @@
  tetris-run)
 
 
-(define RATE 120)  ;; frames/second
+(define RATE 60)  ;; frames/second
 
 (require 2htdp/universe)
 (require threading)
@@ -50,8 +50,10 @@
   (on-release-filtered ws k (λ () (tetris-on-release ws k ms))))
 
 
-(define (tetris-run)
-  (big-bang (new-tetris (millis))
+(define (tetris-run #:tetrion [tion #f])
+  (big-bang (if tion
+                (new-tetris (millis) #:tetrion tion)
+                (new-tetris (millis)))
             [on-tick (λ (ws) (tetris-on-tick ws (millis)))
                      (/ 1 RATE)]
             [on-key (λ (ws k) (tetris-on-key-filtered ws k (millis)))]

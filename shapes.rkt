@@ -112,7 +112,7 @@
             (for/list ([bool row]
                        [x (in-naturals)]
                        #:when bool)
-              (block x y shape-name)))))
+              (block x y shape-name #f)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;

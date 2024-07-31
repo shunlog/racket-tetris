@@ -4,11 +4,6 @@
 ; Draws Tetris data structures
 
 (require racket/contract)
-(require "playfield.rkt")
-(require "block.rkt")
-(require "tetrion.rkt")
-(require "tetris.rkt")
-
 (provide
  (contract-out
   [draw-playfield (-> playfield? image?)]
@@ -20,10 +15,10 @@
 ;; --------------------------
 ;; Configuration constants
 
-(define BLOCK-W 15)
+(define BLOCK-W 20)
 (define VANISH-AREA-ROWS 2)
 
-(define BLOCK-COLOR-HASH
+(define BLOCK-TYPE-COLOR
   (hash 'L (make-color 255 128 0)
         'J (make-color 0 132 255)
         'S (make-color 0 217 51)
@@ -31,7 +26,6 @@
         'T (make-color 205 7 245)
         'I (make-color 0 247 255)
         'O (make-color 242 235 12)
-        'ghost (color 196 196 196)
         'garbage (color 156 154 154)))
 
 
@@ -40,6 +34,12 @@
 
 (require threading)
 (require 2htdp/image)
+(require "playfield.rkt")
+(require "block.rkt")
+(require "shapes.rkt")
+(require "tetrion.rkt")
+(require "tetris.rkt")
+(require "image-utils.rkt")
 
 
 ;; --------------------------
@@ -52,22 +52,54 @@
 
 
 (module+ test
-  (for ([t BLOCK-TYPES])
-    (define color (hash-ref BLOCK-COLOR-HASH t #f))
-    (check-not-false color (format "No color specified for type ~v in BLOCK-COLOR-HASHs hash." t))
-    (check-true
-     (image-color? color)   
-     (format "Not a color: ~v (for type ~v in BLOCK-COLOR-HASHs hash)." color t))))
+  (for ([type `(,@SHAPE-NAMES 'garbage)])
+    (test-case
+        "Colors specified for all block types"
+      (check-not-exn
+       (λ () (hash-ref BLOCK-TYPE-COLOR type))
+       (format "No color specified for type ~v in BLOCK-COLOR-HASHs hash." type)))))
 
 
+;; Pretty blocks with borders,
+;; but slower
+(define (draw-block2 b)
+  (define type-color (hash-ref BLOCK-TYPE-COLOR (block-type b)))
+  (define block-color
+    (if (not (block-ghost b))
+        type-color
+        (struct-copy color type-color [alpha 100])))
+  (define outline-color (darker block-color))
+  (define border-width (inexact->exact (ceiling (/ BLOCK-W 8))))
+  ;; the pen draws half of the border outside the square width
+  (define square-width (- BLOCK-W border-width))  
+  (overlay (square square-width
+                   "outline"
+                   (make-pen outline-color border-width "solid" "round" "round"))
+           (square (- square-width border-width) "solid" block-color)
+           ;; bring the image to the correct width
+           (square BLOCK-W "solid" (make-color 0 0 0 0))))
+
+
+;; The fastest drawing method
 (define (draw-block b)
-  (define type (block-type b))
-  (define color (hash-ref BLOCK-COLOR-HASH type))
-  (overlay
-   (square (- BLOCK-W 2) "solid" color)
-   (square BLOCK-W
-           "solid"
-           (make-color 30 30 30))))
+  (define type-color (hash-ref BLOCK-TYPE-COLOR (block-type b)))
+  (define block-color
+    (if (not (block-ghost b))
+        type-color
+        (struct-copy color type-color [alpha 100])))  
+  (square BLOCK-W "solid" block-color))
+
+
+(module+ test
+  ;; Draw a table with all the block types, also in ghost form
+  (for*/fold ([rows empty-image])
+             ([type `(garbage ,@SHAPE-NAMES)]
+              [ghost '(#f #t)])
+    (above rows
+           (beside (overlay/align "left" "middle"
+                                  (text (format "~v ~a" type (if ghost "ghost" "")) 16 "black")
+                                  (rectangle 120 (+ 10 BLOCK-W) "solid" "white"))
+                   (draw-block (block 0 0 type ghost))))))
 
 
 ; Image Natural Color -> Image
@@ -114,15 +146,15 @@
 ;; .■..
 ;; ■■■.
 (module+ test
-  (displayln "Drawing a T on a 3x4 grid:")
+  (displayln "Drawing a ghost T on a 3x4 grid:")
   (~> (empty-playfield 4 3)
       (playfield-add-blocks
        (list
-        (block 0 0 'T)
-        (block 1 0 'T)
-        (block 2 0 'T)
-        (block 1 1 'T)))
-      (draw-playfield)))
+        (block 0 0 'T #t)
+        (block 1 0 'T #t)
+        (block 2 0 'T #t)
+        (block 1 1 'T #t)))
+      draw-playfield))
 
 
 
