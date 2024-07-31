@@ -62,7 +62,7 @@
 
 ;; Pretty blocks with borders,
 ;; but slower
-(define (draw-block2 b)
+(define (draw-block b)
   (define type-color (hash-ref BLOCK-TYPE-COLOR (block-type b)))
   (define block-color
     (if (not (block-ghost b))
@@ -81,7 +81,7 @@
 
 
 ;; The fastest drawing method
-(define (draw-block b)
+(define (draw-block2 b)
   (define type-color (hash-ref BLOCK-TYPE-COLOR (block-type b)))
   (define block-color
     (if (not (block-ghost b))

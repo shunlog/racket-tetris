@@ -68,7 +68,7 @@
 (define (playfield-blocks p)
   (define hash (playfield-block-hash p))
   (define (key-val-to-block k v)
-    (struct-copy block v [x (car k)] [y (cadr k)]))
+    (block (car k) (cadr k) v #f))
   (hash-map hash key-val-to-block))
 
 
@@ -136,8 +136,10 @@
     [(not (playfield-can-place? p block))
      (error "Can't place block at position " (list x y))]
     [else
+     (define btype (block-type block))
+
      (define new-hash
-       (hash-set hash `(,x ,y) block))
+       (hash-set hash `(,x ,y) btype))
      (struct-copy playfield p
                   [block-hash new-hash])]))
 
