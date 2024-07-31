@@ -249,12 +249,6 @@
              (+ (posn-y p1) (posn-y p2))))
 
 
-; Add a posn to piece position
-(define (piece-move p posn)
-  (struct-copy piece p
-               [posn (posn+ posn (piece-posn p))]))
-
-
 ; Tetrion -> Playfield
 (define (tetrion-playfield tn)
   (define piece (tetrion-piece tn))
@@ -279,12 +273,14 @@
 
 ; Tetrion Posn -> Tetrion
 (define (tetrion-move tn posn)
-  (define new-piece (piece-move (tetrion-piece tn) posn))
+  (define p (tetrion-piece tn))
+  (define moved-piece (struct-copy piece p
+                 [posn (posn+ posn (piece-posn p))]))
   (define locked (tetrion-locked tn))
   (cond
-    [(playfield-can-place? locked (piece-blocks new-piece))
+    [(playfield-can-place? locked (piece-blocks moved-piece))
      (struct-copy tetrion tn
-                  [piece new-piece])]
+                  [piece moved-piece])]
     [else (error "Can't move piece by " posn)]))
 
 
