@@ -44,8 +44,7 @@
 (provide
  (contract-out
   [new-tetrion (->* ()
-                    (#:starting-shape (or/c shape-name? boolean?)
-                     #:rows natural-number/c
+                    (#:rows natural-number/c
                      #:cols natural-number/c
                      #:shape-generator shape-generator?
                      #:locked-blocks (listof block?))
@@ -156,8 +155,8 @@
   (test-case
       "Spawn a piece"
     (define ft0
-      (new-tetrion #:starting-shape 'L
-                         #:cols 10 #:rows 2))
+      (~> (new-tetrion #:cols 10 #:rows 2)
+          (tetrion-spawn 'L)))
     ;; Spawn an L on the left
     (check
      block-lists=?
@@ -197,13 +196,8 @@
   
   (test-case
       "Block out: the spawned piece overlaps with locked blocks."
-    
     (define tn-full
-      (struct-copy
-       tetrion
-       (new-tetrion #:starting-shape 'O)
-       [locked (playfield-add-blocks (empty-playfield 10 20)
-                                     (list (block 5 21 'I #f)))]))
+      (new-tetrion #:locked-blocks (list (block 5 21 'I #f))))
     (check-exn
      #rx"block out"
      (λ () (tetrion-spawn tn-full 'L))))
@@ -211,17 +205,12 @@
 
 
 (define (new-tetrion #:shape-generator [shape-generator 7-loop-shape-generator]
-                     #:starting-shape [start-shape (shape-generator)]
                      #:cols [cols 10]
                      #:rows [rows 20]
                      #:locked-blocks [locked-blocks '()])
-  (define new-tn
-    (tetrion #f
-             (playfield-add-blocks (empty-playfield cols rows) locked-blocks)
-             shape-generator))
-  (cond
-    [(not start-shape) new-tn]
-    [else (tetrion-spawn new-tn start-shape)]))
+  (define locked (~> (empty-playfield cols rows)
+                     (playfield-add-blocks locked-blocks)))
+  (tetrion #f locked shape-generator))
 
 
 ;; Return the blocks representing a Piece
@@ -253,7 +242,8 @@
 (module+ test
   (test-case
       "Get playfield immediately after lock, with null Piece"
-    (define ft1 (~> (new-tetrion #:starting-shape 'T #:cols 3 #:rows 2)
+    (define ft1 (~> (new-tetrion #:cols 3 #:rows 2)
+                    (tetrion-spawn 'T) 
                     tetrion-hard-drop
                     tetrion-lock))
     (check block-lists=?
@@ -303,37 +293,41 @@
 (module+ test
   (test-case
       "Rotate cw"
-    (define ft0 (new-tetrion #:starting-shape 'L #:cols 4 #:rows 2))
+    (define ft0 (~> (new-tetrion #:cols 4 #:rows 2)
+                    (tetrion-spawn 'L)))
 
     ;; assert initial setup
-    (check
-     block-lists=?
-     (playfield-blocks (tetrion-playfield ft0))
-     (strings->blocks '("..L."
-                        "LLL."
-                        "...."
-                        "....")))
+    (check block-lists=?
+           (playfield-blocks (tetrion-playfield ft0))
+           (strings->blocks '("..L."
+                              "LLL."
+                              "...."
+                              "....")))
 
     (define ft1 (tetrion-rotate ft0 #t))
-    (check
-     block-lists=?
-     (playfield-blocks (tetrion-playfield ft1))
-     (strings->blocks '(".L.."
-                        ".L.."
-                        ".LL."
-                        "....")))
-
-    (define ft2 (~> ft1
-                   tetrion-left
-                   (tetrion-rotate #t)))
-    (check
-     block-lists=?
-     (playfield-blocks (tetrion-playfield ft2))
-     (strings->blocks '("...."
-                        "LLL."
-                        "L..."
-                        "....")))
-    )
+    (check block-lists=?
+           (playfield-blocks (tetrion-playfield ft1))
+           (strings->blocks '(".L.."
+                              ".L.."
+                              ".LL."
+                              "...."))))
+  (test-case
+      "Rotate 90 with wall kick"
+    (define ft2 (~> (new-tetrion #:cols 4 #:rows 2)
+                    (tetrion-spawn #:x -1 #:y 1 'L #:rotation 1)))
+    ;; assert initial setup
+    (check block-lists=?
+           (playfield-blocks (tetrion-playfield ft2))
+           (strings->blocks '("L..."
+                              "L..."
+                              "LL.."
+                              "....")))
+    (check block-lists=?
+           (playfield-blocks (tetrion-playfield (tetrion-rotate ft2 #t)))
+           (strings->blocks '("...."
+                              "LLL."
+                              "L..."
+                              "...."))))
 )
 
 
@@ -390,28 +384,23 @@
 (module+ test
   (test-case
       "Move the tetrion piece"
-    (define ft0
-      (new-tetrion #:starting-shape 'I
-                         #:cols 4
-                         #:rows 2
-                         #:locked-blocks (strings->blocks '("JJ.."))))
+    (define ft0 (~> (new-tetrion #:cols 4 #:rows 2
+                                 #:locked-blocks (strings->blocks '("JJ..")))
+                    (tetrion-spawn 'I)))
 
     ;; check assumption
-    (check
-     block-lists=?
-     (playfield-blocks (tetrion-playfield ft0))
-     (strings->blocks '("IIII"
-                        "...."
-                        "JJ..")))
+    (check block-lists=?
+           (playfield-blocks (tetrion-playfield ft0))
+           (strings->blocks '("IIII"
+                              "...."
+                              "JJ..")))
     
     ;; Successful move
-    (define ft0-drop
-      (tetrion-move ft0 (make-posn 0 -1)))
-    (check
-     block-lists=?
-     (playfield-blocks (tetrion-playfield ft0-drop))
-     (strings->blocks '("IIII"
-                        "JJ..")))
+    (define ft0-drop (tetrion-move ft0 (make-posn 0 -1)))
+    (check block-lists=?
+           (playfield-blocks (tetrion-playfield ft0-drop))
+           (strings->blocks '("IIII"
+                              "JJ..")))
 
     ;; Fail on collision with locked blocks
     (check-exn
@@ -419,10 +408,8 @@
      (λ () (tetrion-move ft0-drop (make-posn 0 -1))))
 
     ;; Fail on collision with bottom of playfield
-    (define ft1
-      (new-tetrion #:starting-shape 'L
-                         #:cols 3
-                         #:rows 0))    
+    (define ft1 (~> (new-tetrion #:cols 3 #:rows 0)
+                    (tetrion-spawn 'L)))    
     (check-exn
      exn:fail?
      (λ () (tetrion-move ft1 (make-posn 0 -1))))
@@ -438,8 +425,9 @@
      (λ () (tetrion-move ft1 (make-posn -1 0))))
     
     ;; Should work on new instance
+    (define tn-new (~> (new-tetrion) (tetrion-spawn)))
     (check-not-exn
-     (λ () (tetrion-move (new-tetrion #:starting-shape 'L) (make-posn 0 -1))))
+     (λ () (tetrion-move tn-new (make-posn 0 -1))))
     ))
 
 
@@ -466,7 +454,8 @@
 (module+ test
   (test-case
       "Hard drop to the floor"
-    (define ft0 (new-tetrion #:starting-shape 'O #:cols 4 #:rows 2))
+    (define ft0 (~> (new-tetrion #:cols 4 #:rows 2)
+                    (tetrion-spawn 'O)))
     ;; assert initial setup
     (check
      block-lists=?
@@ -488,7 +477,8 @@
 
   (test-case
       "Hard drop to a block"
-    (define ft0 (new-tetrion #:starting-shape 'O #:cols 4 #:rows 3))
+    (define ft0 (~> (new-tetrion #:cols 4 #:rows 3)
+                    (tetrion-spawn 'O)))
     (define plf1 (playfield-add-blocks (tetrion-locked ft0)
                                        (strings->blocks '("LL.."))))
     (define ft1 (struct-copy tetrion ft0 [locked plf1]))
@@ -542,7 +532,8 @@
 (module+ test
   (test-case
       "Lock out if locked right after spawn (since pieces spawn above the ceiling)"    
-    (define ft0 (new-tetrion #:starting-shape 'L))
+    (define ft0 (~> (new-tetrion )
+                    (tetrion-spawn 'L)))
     (check-exn
      #rx"lock out"
      (λ () (tetrion-lock ft0))))
@@ -551,7 +542,8 @@
   (test-case
       "No lock out if at least a single block below ceiling"
     (define tn-dropped
-      (~> (new-tetrion #:starting-shape 'O)
+      (~> (new-tetrion )
+          (tetrion-spawn 'O)
           tetrion-drop
           ; move it out of the way
           tetrion-right

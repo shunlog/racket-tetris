@@ -177,7 +177,8 @@
 
 (module+ test
   (displayln "Drawing a new Tetrion")
-  (define ft0 (new-tetrion #:starting-shape 'L))
+  (define ft0 (~> (new-tetrion)
+                  (tetrion-spawn 'L)))
   (define tn-drop1 (tetrion-drop ft0))
   (define tn-drop2 (tetrion-drop tn-drop1))
   (define tn-drop3 (tetrion-drop tn-drop2))

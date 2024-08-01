@@ -179,42 +179,27 @@
 
 
 (module+ test
-  (define t0
-    (new-tetris
-     0
-     #:tetrion (new-tetrion
-                      #:starting-shape 'L
-                      #:rows 2)))
+  (define t0 (new-tetris 0 #:tetrion (~> (new-tetrion #:rows 2)
+                                         (tetrion-spawn 'L))))
 
   ;; Assert that we got the expected shape
-  (check                       
-   block-lists=?
-   (~> t0
-       tetris-tn
-       tetrion-playfield
-       playfield-blocks)
-   (strings->blocks '(".....L...."
-                      "...LLL...."
-                      ".........."
-                      "..........")))
+  (check block-lists=?
+         (~> t0 tetris-tn tetrion-playfield playfield-blocks)
+         (strings->blocks '(".....L...."
+                            "...LLL...."
+                            ".........."
+                            "..........")))
 
-  
   (test-case
       "Gravity drop one row"
     (define t1 (tetris-gravity-tick t0 (+ 2 MS/DROP)))
-    (check
-     block-lists=?
-     (~> t1
-         tetris-tn
-         tetrion-playfield
-         playfield-blocks)
-     (strings->blocks '(".........."
-                        ".....L...."
-                        "...LLL...."
-                        "..........")))
-    (check-equal?
-     (tetris-t-drop t1)
-     MS/DROP))
+    (check block-lists=?
+           (~> t1 tetris-tn tetrion-playfield playfield-blocks)
+           (strings->blocks '(".........."
+                              ".....L...."
+                              "...LLL...."
+                              "..........")))
+    (check-equal? (tetris-t-drop t1) MS/DROP))
 
   (test-case
       "Gravity drop two rows in a tick"
@@ -222,34 +207,24 @@
                                     (+ 1 (inexact->exact (* 2 MS/DROP)))))
     (check
      block-lists=?
-     (~> t2
-         tetris-tn
-         tetrion-playfield
-         playfield-blocks)
+     (~> t2 tetris-tn tetrion-playfield playfield-blocks)
      (strings->blocks '(".........."
                         ".........."
                         ".....L...."
                         "...LLL....")))
-    (check-equal?
-     (tetris-t-drop t2)
-     (* 2 MS/DROP)))
+    (check-equal? (tetris-t-drop t2) (* 2 MS/DROP)))
 
   (test-case
       "Don't gravity drop when not enough time has passed"
     (define t3 (tetris-gravity-tick t0 (inexact->exact (* 0.5 MS/DROP))))
     (check
      block-lists=?
-     (~> t3
-         tetris-tn
-         tetrion-playfield
-         playfield-blocks)
+     (~> t3 tetris-tn tetrion-playfield playfield-blocks)
      (strings->blocks '(".....L...."
                         "...LLL...."
                         ".........."
                         "..........")))
-    (check-equal?
-     (tetris-t-drop t3)
-     0))
+    (check-equal? (tetris-t-drop t3) 0))
   )
 
 
