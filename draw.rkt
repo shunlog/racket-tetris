@@ -52,7 +52,7 @@
 
 
 (module+ test
-  (for ([type `(,@SHAPE-NAMES 'garbage)])
+  (for ([type `(,@SHAPE-NAMES garbage)])
     (test-case
         "Colors specified for all block types"
       (check-not-exn
