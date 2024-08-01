@@ -187,4 +187,7 @@
           (~> tn-drop3 draw-tetrion)))
 
 (define (draw-tetris t)
-  (draw-tetrion (tetris-tn t)))
+  (overlay/align
+   "left" "top"
+   (text (format "FPS: ~a" (round (tetris-fps t))) 24 "green")
+   (draw-tetrion (tetris-tn t))))

@@ -24,7 +24,8 @@
                     #:cols natural-number/c)
                    tetris?)]
   [tetris-tn (-> tetris? tetrion?)]
-
+  [tetris-fps (-> tetris? number?)]
+  
   ;; Player actions
   [tetris-left-pressed (-> tetris? natural-number/c tetris?)]
   [tetris-left-released (-> tetris? natural-number/c tetris?)]
@@ -62,7 +63,7 @@
 ;;   - t-drop: last time the piece was dropped due to gravity
 ;;   - t-dirn: last time when the piece started moving
 ;;             (when both direction had been depressed, and one of them was pressed)
-(struct tetris [tn pressed-hash t-drop t-dirn t-autoshift])
+(struct tetris [tn pressed-hash t-drop t-dirn t-autoshift t-ticks])
 
 
 ; -------------------------------
@@ -79,7 +80,7 @@
                     #:rows [rows 20]
                     #:cols [cols 10]
                     #:tetrion [tetrion (new-tetrion #:rows rows #:cols cols)])
-  (~> (tetris tetrion (hash) ms 0 0)
+  (~> (tetris tetrion (hash) ms 0 0 '(0 0 0 0 0))
       (tetris-spawn ms)))
 
 
@@ -329,9 +330,24 @@
     [else (tetris--autoshift t ms 'left)]))
 
 
+(define (tetris-fps-tick t ms)
+  (define ticks (tetris-t-ticks t))
+  (define new-ticks (append (cdr ticks) (list ms)))
+  (struct-copy tetris t
+               [t-ticks new-ticks]))
+
+(define (tetris-fps t)
+  (define ticks (tetris-t-ticks t))
+  (define dts (for/sum ([t1 ticks]
+                        [t2 (cdr ticks)])
+                (- t2 t1)))
+  (define dt-avg (/ (exact->inexact dts) (sub1 (length ticks))))
+  (/ 1000.0 dt-avg))
+
 ;; Used in big-bang on every tick.
 (define (tetris-on-tick t ms)
   (~> t
+      (tetris-fps-tick ms)
       (tetris-gravity-tick ms)
       (tetris-autoshift-tick ms)))
 
