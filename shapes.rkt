@@ -4,12 +4,14 @@
 (require racket/lazy-require)
 (require rackunit)
 (require racket/generator)
+(require racket/draw)
 (require "utils.rkt")
 
 (lazy-require ["block.rkt" (block block?)])
 
 
 (provide
+ SHAPE-COLOR
  (contract-out
   [SHAPE-NAMES (listof symbol?)]
   [shape-name? (-> any/c boolean?)]
@@ -49,6 +51,16 @@
   (require rackunit)
   (displayln "Running tests."))
 
+
+(define SHAPE-COLOR
+  (hash 'L (make-color 255 128 0)
+        'J (make-color 0 132 255)
+        'S (make-color 0 217 51)
+        'Z (make-color 245 7 7)
+        'T (make-color 205 7 245)
+        'I (make-color 0 247 255)
+        'O (make-color 242 235 12)
+        'garbage (make-color 156 154 154)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Shape matrices with pre-computed rotations ;;
@@ -227,3 +239,5 @@
   (check-equal?
    (kick-data 'L 3 0)
    '(( 0  0) (-1  0) (-1 -1) ( 0 +2) (-1 +2))))
+
+
