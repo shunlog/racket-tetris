@@ -59,13 +59,13 @@
     [((release down))
      (set! tetris (tetris-soft-drop-released tetris (millis)))]
     )
-  (send tetris-canvas refresh))
+  (send tetris-canvas refresh-now))
 
 (define (on-tetris-tick)
   (set! tetris (tetris-on-tick tetris (millis)))
-  (send tetris-canvas refresh))
+  (send tetris-canvas refresh-now))
 
-(define FPS 60)
+(define FPS 50)
 (define timer (new timer%
                    [notify-callback on-tetris-tick]
                    [interval (inexact->exact (round (/ 1000 FPS)))]))
