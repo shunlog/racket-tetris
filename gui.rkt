@@ -51,13 +51,27 @@
 
 
 ;; Override the frame%'s event handler,
-;; which by default consumes some char events, including the arrow keys
+;; which by default consumes some char events, including the arrow keys.
+;; Make the frame ignore auto-key / autofire
 (define tetris-frame%
   (class frame%
     (init) (super-new)
+    
+    (define keys-state-hash (make-hash))
+    
     (define/override (on-subwindow-char receiver event)
-      (on-tetris-event event)
-      #f  ;; pass the event further
+      (define kc (send event get-key-code))
+      (define pressed? (not (equal? 'release kc)))
+      (define key-code
+        (if pressed? kc (send event get-key-release-code)))
+      (define was-pressed? (hash-ref keys-state-hash key-code #f))
+
+      (if (and was-pressed? pressed?)
+          #f                          ; auto-key / autofire, ignore event
+          (on-tetris-event event))    ; else pass event to tetris
+
+      (hash-set! keys-state-hash key-code pressed?)
+      #f  ;; return #f to pass the event further
       )))
 
 
