@@ -15,7 +15,10 @@
                                    (or (shape-name? (string->symbol (string ch)))
                                        (equal? ch #\.)))))
                        (listof block?))]
-  [block-move (-> block? posn? block?)]))
+  [block-move (-> block? posn? block?)]
+  [blocks-max-x (-> (listof block?) number?)]
+  [blocks-min-x (-> (listof block?) number?)]
+  [blocks-min-y (-> (listof block?) number?)]))
 
 
 ; -------------------------------
@@ -69,24 +72,24 @@
 
 (module+ test
   (test-case
-     "strings->blocks"
-   (define blocks
-     (strings->blocks
-      '("LJS.O"
-        ".LIO")))
-   (define expected
-     (list
-      (block 1 0 'L #f)
-      (block 2 0 'I #f)
-      (block 3 0 'O #f)
-      (block 0 1 'L #f)
-      (block 1 1 'J #f)
-      (block 2 1 'S #f)
-      (block 4 1 'O #f)))
-   (for ([b blocks])
-     (check-not-false
-      (member b expected)
-      (format "Block ~v not in the list of expected blocks" b)))))
+      "strings->blocks"
+    (define blocks
+      (strings->blocks
+       '("LJS.O"
+         ".LIO")))
+    (define expected
+      (list
+       (block 1 0 'L #f)
+       (block 2 0 'I #f)
+       (block 3 0 'O #f)
+       (block 0 1 'L #f)
+       (block 1 1 'J #f)
+       (block 2 1 'S #f)
+       (block 4 1 'O #f)))
+    (for ([b blocks])
+      (check-not-false
+       (member b expected)
+       (format "Block ~v not in the list of expected blocks" b)))))
 
 
 ; Block Posn -> Block
@@ -113,3 +116,16 @@
      exn:fail?
      (λ () (block-move (block 0 0 'L #f) (make-posn -1 0))))
     ))
+
+
+(define (blocks-max-x bl)
+  (apply max (for/list ([b bl])
+               (block-x b))))
+
+(define (blocks-min-x bl)
+  (apply min (for/list ([b bl])
+               (block-x b))))
+
+(define (blocks-min-y bl)
+  (apply min (for/list ([b bl])
+               (block-y b))))

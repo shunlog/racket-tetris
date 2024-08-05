@@ -131,16 +131,19 @@
                        #:x [x #f]
                        #:y [y #f]
                        #:rotation [rotation 0])
-  (define grid-cols
-    (~> tn tetrion-locked playfield-cols))
-  (define grid-rows
-    (~> tn tetrion-locked playfield-rows))
+  (define cols (~> tn tetrion-locked playfield-cols))
+  (define rows (~> tn tetrion-locked playfield-rows))
+
+  (define shape-blocks (shape-name->blocks shape-name rotation))
+  (define piece-width (add1 (- (blocks-max-x shape-blocks)
+                               (blocks-min-x shape-blocks))))
+  (define leftmost-x (floor (/ (- cols piece-width) 2)))
   (define piece-x (or x
-                      (floor (/ (- grid-cols (shape-width shape-name)) 2))))
+                      (- leftmost-x (blocks-min-x shape-blocks))))
   ;; the lowest blocks should spawn on the first line of the vanish zone,
   ;; so if there are 20 rows, it should spawn on row with index 20 (0-based)
   (define piece-y (or y
-                      (- grid-rows (shape-gap-below shape-name))))  
+                      (- rows (blocks-min-y shape-blocks))))  
   (define new-piece
     (piece (make-posn piece-x piece-y) shape-name rotation))
   (cond
@@ -153,47 +156,52 @@
 
 (module+ test
   (test-case
-      "Spawn a piece"
+      "Spawn a piece in the middle when symmetric"
     (define ft0
       (~> (new-tetrion #:cols 10 #:rows 2)
           (tetrion-spawn 'L)))
-    ;; Spawn an L on the left
-    (check
-     block-lists=?
-     (~> ft0
-         (tetrion-spawn 'L)
-         tetrion-playfield
-         playfield-blocks)
-     (strings->blocks '(".....L...."
-                        "...LLL...."
-                        ".........."
-                        "..........")))
-
-    ;; Spawn a I in the middle
-    (check
-     block-lists=?
-     (~> ft0
-         (tetrion-spawn 'I)
-         tetrion-playfield
-         playfield-blocks)
-     (strings->blocks '("...IIII..."
-                        ".........."
-                        ".........."))))
+    (check block-lists=?
+           (~> ft0 (tetrion-spawn 'L) tetrion-playfield playfield-blocks)
+           (strings->blocks '(".....L...."
+                              "...LLL...."
+                              ".........."
+                              ".........."))))
 
   (test-case
-      "Spawn piece at specific position"
+      "Spawn a piece on the left of the middle when asymmetric"
+    (define ft1
+      (~> (new-tetrion #:cols 10 #:rows 2)
+          (tetrion-spawn 'I)))
+    (check block-lists=?
+           (~> ft1 tetrion-playfield playfield-blocks)
+           (strings->blocks '("...IIII..."
+                              ".........."
+                              ".........."))))
+
+  (test-case
+      "Spawn piece at a specific position and rotation"
     (define ft0
       (~> (new-tetrion #:cols 4 #:rows 10)
           (tetrion-spawn 'T #:x 0 #:y 0 #:rotation 3)))
+    (check block-lists=?
+           (~> ft0 tetrion-playfield playfield-blocks)
+           (strings->blocks '(".T.."
+                              "TT.."
+                              ".T.."))))
 
-    (check
-     block-lists=?
-     (~> ft0 tetrion-playfield playfield-blocks)
-     (strings->blocks '(".T.."
-                        "TT.."
-                        ".T..")))    
-    )
-  
+  (test-case
+      "Spawn piece in vanish zone with specific rotation"
+    (define ft0
+      (~> (new-tetrion #:cols 4 #:rows 1)
+          (tetrion-spawn 'I #:rotation 1)))
+    (check block-lists=?
+           (~> ft0 tetrion-playfield playfield-blocks)
+           (strings->blocks '(".I.."
+                              ".I.."
+                              ".I.."
+                              ".I.."
+                              "...."))))
+
   (test-case
       "Block out: the spawned piece overlaps with locked blocks."
     (define tn-full
@@ -507,16 +515,17 @@
 
 
 ; Tetrion -> Tetrion
-; Locks piece (adds the blocks to `locked`) and clears the blueprint (sets Piece to #f)
-; Raises error on lock out.
+; Locks piece (adds the blocks to `locked`) and clears it (sets it to #f).
+; Raises error on lock out, when all its blocks are in the vanish zone.
 (define (tetrion-lock tn)
   (define piece (tetrion-piece tn))
-  (define plf-rows (playfield-rows (tetrion-locked tn)))
+  (define rows (playfield-rows (tetrion-locked tn)))
   (define piece-min-y
     (+ (posn-y (piece-posn piece))
        (shape-gap-below (piece-shape-name piece))))
   (cond
-    [(>= piece-min-y plf-rows)
+    [(>= (blocks-min-y (piece-blocks piece))
+         rows)
      (error "All piece blocks above ceiling: lock out")]
     [else
      (define new-locked
@@ -542,12 +551,10 @@
   (test-case
       "No lock out if at least a single block below ceiling"
     (define tn-dropped
-      (~> (new-tetrion )
-          (tetrion-spawn 'O)
-          tetrion-drop
-          ; move it out of the way
-          tetrion-right
-          tetrion-right
-          tetrion-right))
+      (~> (new-tetrion)
+          ;; assuming the I will be spawned on the bottom of the vanish zone
+          (tetrion-spawn 'I #:rotation 1)
+          ;; move the I so 1 block is below vanish zone
+          tetrion-drop))
     (check-not-exn
      (λ () (tetrion-lock tn-dropped)))))
