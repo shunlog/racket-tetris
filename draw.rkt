@@ -1,41 +1,42 @@
 #lang racket/base
 
-
-; Draws Tetris data structures
-
-(require racket/contract)
-(provide
- (contract-out
-  [draw-playfield (-> playfield? image?)]
-  [draw-tetrion (-> tetrion? image?)]
-  [draw-tetris (-> tetris? image?)]
-  ))
-
-
-;; --------------------------
-;; Configuration constants
-
-(define BLOCK-W 20)
-(define VANISH-AREA-ROWS 2)
-
-
-
-
-;; --------------------------
-;; Imports
-
 (require threading)
-(require 2htdp/image)
+(require racket/draw)
+(require racket/class)
 (require "playfield.rkt")
 (require "block.rkt")
 (require "shapes.rkt")
-(require "tetrion.rkt")
-(require "tetris.rkt")
-(require "image-utils.rkt")
 
 
-;; --------------------------
-;; Implementation
+(define BLOCK-W 20)
+(define VANISH-ZONE-H 2)
+
+
+(provide
+ playfield-canvas-size
+ draw-playfield
+ )
+
+
+;; Playfield DC -> #:void
+(define (draw-playfield plf dc)
+  (define rows (playfield-rows plf))
+  (define cols (playfield-cols plf))
+  (define (draw-block b)
+    (define x (* BLOCK-W (block-x b)))
+    (define y (* BLOCK-W
+                 (- (+ VANISH-ZONE-H (sub1 rows))
+                    (block-y b))))
+    (define color (hash-ref SHAPE-COLOR (block-type b)))
+    (send dc set-brush color 'solid)
+    (send dc draw-rectangle x y BLOCK-W BLOCK-W))
+
+  (send dc set-brush "gray" 'solid)  
+  (send dc draw-rectangle 0 0 (* BLOCK-W cols) (* BLOCK-W VANISH-ZONE-H))
+  (for ([block (playfield-blocks plf)])
+    (draw-block block)))
+
+
 
 ; Init the test module
 (module+ test
@@ -43,144 +44,31 @@
   (displayln "Running tests."))
 
 
-(module+ test
-  (for ([type `(,@SHAPE-NAMES garbage)])
-    (test-case
-        "Colors specified for all block types"
-      (check-not-exn
-       (λ () (hash-ref BLOCK-TYPE-COLOR type))
-       (format "No color specified for type ~v in BLOCK-COLOR-HASHs hash." type)))))
-
-
-;; Pretty blocks with borders,
-;; but slower
-(define (draw-block b)
-  (define type-color (hash-ref BLOCK-TYPE-COLOR (block-type b)))
-  (define block-color
-    (if (not (block-ghost b))
-        type-color
-        (struct-copy color type-color [alpha 100])))
-  (define outline-color (darker block-color))
-  (define border-width (inexact->exact (ceiling (/ BLOCK-W 8))))
-  ;; the pen draws half of the border outside the square width
-  (define square-width (- BLOCK-W border-width))  
-  (overlay (square square-width
-                   "outline"
-                   (make-pen outline-color border-width "solid" "round" "round"))
-           (square (- square-width border-width) "solid" block-color)
-           ;; bring the image to the correct width
-           (square BLOCK-W "solid" (make-color 0 0 0 0))))
-
-
-;; The fastest drawing method
-(define (draw-block2 b)
-  (define type-color (hash-ref BLOCK-TYPE-COLOR (block-type b)))
-  (define block-color
-    (if (not (block-ghost b))
-        type-color
-        (struct-copy color type-color [alpha 100])))  
-  (square BLOCK-W "solid" block-color))
-
-
-(module+ test
-  ;; Draw a table with all the block types, also in ghost form
-  (for*/fold ([rows empty-image])
-             ([type `(garbage ,@SHAPE-NAMES)]
-              [ghost '(#f #t)])
-    (above rows
-           (beside (overlay/align "left" "middle"
-                                  (text (format "~v ~a" type (if ghost "ghost" "")) 16 "black")
-                                  (rectangle 120 (+ 10 BLOCK-W) "solid" "white"))
-                   (draw-block (block 0 0 type ghost))))))
-
-
-; Image Natural Color -> Image
-(define (draw-border-around-img img thickness color)
-  (define img-width (image-width img))
-  (define img-height (image-height img))
-  (define width (+ thickness img-width))
-  (define height (+ thickness img-height))
-  (overlay/align "middle" "middle"
-                 img
-                 (rectangle width height "solid" color)))
-
-
-(define (draw-playfield p)
-  (define cols (playfield-cols p))
-  (define rows (playfield-rows p))
-  (define grid-width (* BLOCK-W cols))
-  (define grid-height (* BLOCK-W rows))
-  (define vanish-area-height (* BLOCK-W VANISH-AREA-ROWS))
-  (define grid (above
-                (rectangle grid-width vanish-area-height  "solid" "lightgray")
-                (rectangle grid-width grid-height "solid" "white")))
-  
-  (define (draw-block-on-grid b grid)
-    (define x (* BLOCK-W (block-x b)))
-    (define y (* BLOCK-W (+ (- rows (block-y b))
-                            VANISH-AREA-ROWS)))
-    (place-image/align (draw-block b)
-                       x y
-                       "left" "bottom"
-                       grid))
-  (define (draw-blocks-on-grid)
-    (foldr draw-block-on-grid
-           grid
-           (playfield-blocks p)))
-  
-  (~> (draw-blocks-on-grid)
-      (draw-border-around-img 3 "gray")
-      (draw-border-around-img 5 "white")
-      (draw-border-around-img 3 "darkgray")))
-
-
-;; ....
-;; .■..
-;; ■■■.
-(module+ test
-  (displayln "Drawing a ghost T on a 3x4 grid:")
-  (~> (empty-playfield 4 3)
-      (playfield-add-blocks
-       (list
-        (block 0 0 'T #t)
-        (block 1 0 'T #t)
-        (block 2 0 'T #t)
-        (block 1 1 'T #t)))
-      draw-playfield))
-
+(define (playfield-canvas-size plf)
+  (define w (* BLOCK-W (playfield-cols plf)))
+  (define h (* BLOCK-W (+ (playfield-rows plf)
+                          VANISH-ZONE-H)))
+  (values w h))
 
 
 (module+ test
   (displayln "Drawing two sets of tetrominoes in a 4x10")
-  (define blocks (strings->blocks
-                  '("..."
-                    "LLLZZIIIII"
-                    "LTTTZZOOJI"
-                    "OOTSSTOOJI"
-                    "OOSSTTTJJI")))
-  (~> (empty-playfield 10 5)
-      (playfield-add-blocks blocks)
-      (draw-playfield)))
+  (define plf0
+    (~> (empty-playfield 10 5)
+        (playfield-add-blocks
+         (strings->blocks '("..."
+                            "LLLZZIIIII"
+                            "LTTTZZOOJI"
+                            "OOTSSTOOJI"
+                            "OOSSTTTJJI")))))
 
 
-(define (draw-tetrion tn)
-  (draw-playfield (tetrion-playfield tn)))
+  (define-values (w h) (playfield-canvas-size plf0))
+  (define dc (new bitmap-dc% [bitmap (make-bitmap w h)]))
+  (draw-playfield plf0 dc)
+  (send dc get-bitmap))
 
 
-(module+ test
-  (displayln "Drawing a new Tetrion")
-  (define ft0 (~> (new-tetrion)
-                  (tetrion-spawn 'L)))
-  (define tn-drop1 (tetrion-drop ft0))
-  (define tn-drop2 (tetrion-drop tn-drop1))
-  (define tn-drop3 (tetrion-drop tn-drop2))
-  (beside (~> ft0 tetrion-playfield draw-playfield)
-          (~> tn-drop1 draw-tetrion)
-          (~> tn-drop2 draw-tetrion)
-          (~> tn-drop3 draw-tetrion)))
 
-(define (draw-tetris t)
-  (overlay/align
-   "left" "top"
-   (text (format "FPS: ~a" (round (tetris-fps t))) 24 "green")
-   (draw-tetrion (tetris-tn t))))
+
+

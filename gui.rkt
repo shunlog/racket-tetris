@@ -19,7 +19,7 @@
 (require threading)
 (require racket/gui)
 (require "tetris.rkt")
-(require "draw2.rkt")
+(require "draw.rkt")
 (require "tetrion.rkt")
 
 
