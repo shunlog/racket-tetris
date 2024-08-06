@@ -2,6 +2,7 @@
 
 (require racket/set)
 (require racket/contract)
+(require lang/posn)
 
 
 (provide
@@ -9,7 +10,8 @@
   [block-lists=? (-> (listof any/c) (listof any/c) boolean?)]
   [matrix-rotate-cw (-> (listof (listof any/c))
                         (listof (listof any/c)))]
-  [de-nest (-> (listof any/c) (listof any/c))]))
+  [de-nest (-> (listof any/c) (listof any/c))]
+  [posn+ (-> posn? posn? posn?)]))
 
 
 ;; List List -> Boolean
@@ -40,3 +42,8 @@
    (λ (ls xs)
      (foldr cons xs ls))
    '() lss))
+
+; Add two Posn's
+(define (posn+ p1 p2)
+  (make-posn (+ (posn-x p1) (posn-x p2))
+             (+ (posn-y p1) (posn-y p2))))

@@ -3,6 +3,7 @@
 (require threading)
 (require racket/draw)
 (require racket/class)
+(require lang/posn)
 (require "playfield.rkt")
 (require "block.rkt")
 (require "shapes.rkt")
@@ -10,7 +11,7 @@
 
 (define BLOCK-W 20)
 (define VANISH-ZONE-H 2)
-
+(define GARBAGE-COLOR (make-color 156 154 154))
 
 (provide
  playfield-canvas-size
@@ -18,17 +19,26 @@
  )
 
 
+;; Block -> Color
+(define (block-color b)
+  (define bt (block-type b))
+  (cond
+    [(equal? 'garbage bt) GARBAGE-COLOR]
+    [else
+     (define sname (car bt))
+     (hash-ref SHAPE-COLOR sname)]))
+
+
 ;; Playfield DC -> #:void
 (define (draw-playfield plf dc)
   (define rows (playfield-rows plf))
   (define cols (playfield-cols plf))
   (define (draw-block b)
-    (define x (* BLOCK-W (block-x b)))
+    (define x (* BLOCK-W (posn-x (block-posn b))))
     (define y (* BLOCK-W
                  (- (+ VANISH-ZONE-H (sub1 rows))
-                    (block-y b))))
-    (define color (hash-ref SHAPE-COLOR (block-type b)))
-    (send dc set-brush color 'solid)
+                    (posn-y(block-posn b)))))
+    (send dc set-brush (block-color b) 'solid)
     (send dc draw-rectangle x y BLOCK-W BLOCK-W))
 
   (send dc set-brush "gray" 'solid)  

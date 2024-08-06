@@ -1,18 +1,17 @@
 #lang racket/base
 
-;; A Block is the basic building block of Tetris.
-;; It is simply a structure that keeps track of the block's position and type, BlockType.
+;; A Block represents a filled square in the Tetris grid,
+;; it can be locked, a garbage block, part of the Piece, or even a ghost block.
+
 
 (require racket/contract)
 (provide
  (contract-out
-  [struct block ((x natural-number/c)
-                 (y natural-number/c)
-                 (type block-type?)
-                 (ghost boolean?))]
+  [struct block ((posn nat-posn?) (type block-type/c))]
+  [block-type/c contract?]
   [strings->blocks (-> (listof (λ (s)
                                  (for/and ([ch s])
-                                   (or (shape-name? (string->symbol (string ch)))
+                                   (or (shape-name/c (string->symbol (string ch)))
                                        (equal? ch #\.)))))
                        (listof block?))]
   [block-move (-> block? posn? block?)]
@@ -26,24 +25,44 @@
 
 
 (require rackunit)
-(require "shapes.rkt")
 (require lang/posn)
+(require "shapes.rkt")
+(require "utils.rkt")
+
 
 
 ;; ----------------------------
 ;; Definitions
 
 
-; A Block is a struct:
-; - x, y are coordinates in the Playfield
-; - ghost is a Boolean
-; - type is either a ShapeName or 'garbage
-(struct block [x y type ghost]
-  #:transparent)
+;; A NatPosn is a Posn of 2 natural numbers
+(define (nat-posn? p)
+  (and (posn? p)
+       (natural-number/c (posn-x p))
+       (natural-number/c (posn-y p))))
 
-(define (block-type? t)
-  (or (shape-name? t)
-      (equal? t 'garbage)))
+
+;; A BlockType is either:
+;; - 'garbage
+;; - a cons of ShapeName and one of '(normal ghost piece)
+(define block-type/c
+  (or/c (λ (t) (equal? 'garbage t))
+        (cons/c shape-name/c (one-of/c 'normal 'ghost 'piece))))
+
+
+; A Block is a struct:
+; - posn: a NatPosn that represents its coordinates in the Playfield,
+;         with the origin at the bottom-left corner
+; - type: a BlockType, defines how it will be drawn
+(struct block [posn type]
+  #:transparent)
+(define block/c
+  (struct/c block nat-posn? block-type/c))
+
+
+;; Examples:
+(define GARBAGE-BLOCK (block (make-posn 0 0) 'garbage))
+(define L-GHOST-BLOCK (block (make-posn 5 6) (cons 'L 'ghost)))
 
 
 ; -------------------------------
@@ -61,14 +80,17 @@
 ; Each character is a block, and is taken as the block type,
 ; except for the "." which signifies an empty space
 (define (strings->blocks sl)
+  (define (string->blocks s y)
+    (for/list ([ch s]
+               [x (in-naturals)]
+               #:unless (equal? #\. ch))
+      (define shape-name (string->symbol (string ch)))
+      (block (make-posn x y) (cons shape-name 'normal))))
   (for/fold ([acc-ls '()])
             ([y (in-inclusive-range (sub1 (length sl)) 0 -1)]
              [s sl])
     (append acc-ls
-            (for/list ([ch s]
-                       [x (in-naturals)]
-                       #:unless (equal? #\. ch))
-              (block x y (string->symbol (string ch)) #f)))))
+            (string->blocks s y))))
 
 (module+ test
   (test-case
@@ -79,13 +101,13 @@
          ".LIO")))
     (define expected
       (list
-       (block 1 0 'L #f)
-       (block 2 0 'I #f)
-       (block 3 0 'O #f)
-       (block 0 1 'L #f)
-       (block 1 1 'J #f)
-       (block 2 1 'S #f)
-       (block 4 1 'O #f)))
+       (block (make-posn 1 0) (cons 'L 'normal))
+       (block (make-posn 2 0) (cons 'I 'normal))
+       (block (make-posn 3 0) (cons 'O 'normal))
+       (block (make-posn 0 1) (cons 'L 'normal))
+       (block (make-posn 1 1) (cons 'J 'normal))
+       (block (make-posn 2 1) (cons 'S 'normal))
+       (block (make-posn 4 1) (cons 'O 'normal))))
     (for ([b blocks])
       (check-not-false
        (member b expected)
@@ -95,37 +117,37 @@
 ; Block Posn -> Block
 ; Offset the block coordinates by the posn
 (define (block-move blck posn)
-  (define new-x (+ (posn-x posn) (block-x blck)))
-  (define new-y (+ (posn-y posn) (block-y blck)))
-  (if (or (< new-x 0) (< new-y 0))
-      (error (format "Resulting block position is negative: ~v" (list new-x new-y)))
+  (define blck-posn (block-posn blck))
+  (define new-posn (posn+ blck-posn posn))
+  (if (not (nat-posn? new-posn))
+      (error (format "Resulting block position is negative: ~v" new-posn))
       (struct-copy block blck
-                   [x new-x]
-                   [y new-y])))
+                   [posn new-posn])))
 
 (module+ test
   (test-case
       "block-move: add Posn to Block"
     ;; Works fine
     (check-equal?
-     (block-move (block 1 1 'L #f) (make-posn 2 -1))
-     (block 3 0 'L #f))
+     (block-move (block (make-posn 1 1) (cons 'L 'normal)) (make-posn 2 -1))
+     (block (make-posn 3 0) (cons 'L 'normal)))
 
     ;; Error if pos is negative
     (check-exn
      exn:fail?
-     (λ () (block-move (block 0 0 'L #f) (make-posn -1 0))))
+     (λ () (block-move (block (make-posn 0 0) (cons 'L 'normal))
+                       (make-posn -1 0))))
     ))
 
 
 (define (blocks-max-x bl)
   (apply max (for/list ([b bl])
-               (block-x b))))
+               (posn-x (block-posn b)))))
 
 (define (blocks-min-x bl)
   (apply min (for/list ([b bl])
-               (block-x b))))
+               (posn-x (block-posn b)))))
 
 (define (blocks-min-y bl)
   (apply min (for/list ([b bl])
-               (block-y b))))
+               (posn-y (block-posn b)))))

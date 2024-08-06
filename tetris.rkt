@@ -149,7 +149,7 @@
 
 ;; Tetris -> Tetris
 ;; simply drop the piece,
-;; and update the t-on-ground
+ ;; and update the t-on-ground
 (define (tetris--drop t)
   (define tn (tetris-tn t))
   (define new-tn

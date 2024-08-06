@@ -5,6 +5,7 @@
 (require rackunit)
 (require racket/generator)
 (require racket/draw)
+(require lang/posn)
 (require "utils.rkt")
 
 (lazy-require ["block.rkt" (block block?)])
@@ -14,12 +15,12 @@
  SHAPE-COLOR
  (contract-out
   [SHAPE-NAMES (listof symbol?)]
-  [shape-name? (-> any/c boolean?)]
-  [shape-name->blocks (-> shape-name? rotation? (listof block?))]
-  [shape-width (-> shape-name? natural-number/c)]
-  [shape-gap-below (-> shape-name? natural-number/c)]
+  [shape-name/c contract?]
+  [shape-name->blocks (-> shape-name/c rotation? (listof block?))]
+  [shape-width (-> shape-name/c natural-number/c)]
+  [shape-gap-below (-> shape-name/c natural-number/c)]
   [shape-generator? contract?]
-  [kick-data (-> shape-name? rotation? rotation?
+  [kick-data (-> shape-name/c rotation? rotation?
                  (listof (list/c integer? integer?)))]
   [7-loop-shape-generator shape-generator?]
   ))
@@ -38,8 +39,8 @@
   (not (not (member sexp '(0 1 2 3)))))
 
 
-(define (shape-name? sexp)
-  (not (not (member sexp SHAPE-NAMES))))
+(define shape-name/c
+  (apply one-of/c SHAPE-NAMES))
 
 
 ; -------------------------------
@@ -59,8 +60,7 @@
         'Z (make-color 245 7 7)
         'T (make-color 205 7 245)
         'I (make-color 0 247 255)
-        'O (make-color 242 235 12)
-        'garbage (make-color 156 154 154)))
+        'O (make-color 242 235 12)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Shape matrices with pre-computed rotations ;;
@@ -124,7 +124,17 @@
             (for/list ([bool row]
                        [x (in-naturals)]
                        #:when bool)
-              (block x y shape-name #f)))))
+              (block (make-posn x y) (cons shape-name 'normal))))))
+
+(module+ test
+  (test-case
+      "Shape name to blocks"
+    (check block-lists=?
+           (shape-name->blocks 'L 3)
+           (list (block (make-posn 1 0) '(L . normal))
+                 (block (make-posn 1 1) '(L . normal))
+                 (block (make-posn 0 2) '(L . normal))
+                 (block (make-posn 1 2) '(L . normal))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -133,7 +143,7 @@
 
 
 (define shape-generator?
-  (and/c generator? (-> shape-name?)))
+  (and/c generator? (-> shape-name/c)))
 
 
 ;; Guarantees the order and starting shape

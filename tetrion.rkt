@@ -65,7 +65,7 @@
   ;; Other
   [tetrion-lock (-> tetrion? tetrion?)]
   [tetrion-spawn (->* (tetrion?)
-                      (shape-name?)
+                      (shape-name/c)
                       tetrion?)]))
 
 
@@ -94,7 +94,7 @@
 
 ; A Piece is either #f or a struct:
 ; - posn: Posn
-; - shape-name: shape-name?
+; - shape-name: shape-name/c
 
 ;; Think of the Piece as a "blueprint" instead of actual blocks,
 ;; visualize it as a lump of faded blocks that you can move around.
@@ -205,7 +205,7 @@
   (test-case
       "Block out: the spawned piece overlaps with locked blocks."
     (define tn-full
-      (new-tetrion #:locked-blocks (list (block 5 21 'I #f))))
+      (new-tetrion #:locked-blocks (list (block (make-posn 5 21) (cons 'I 'normal)))))
     (check-exn
      #rx"block out"
      (λ () (tetrion-spawn tn-full 'L))))
@@ -232,11 +232,6 @@
           (for/list ([blck blocks-at-origin])
             (block-move blck (piece-posn piece)))]))
 
-
-; Add two Posn's
-(define (posn+ p1 p2)
-  (make-posn (+ (posn-x p1) (posn-x p2))
-             (+ (posn-y p1) (posn-y p2))))
 
 
 ; Tetrion -> Playfield
