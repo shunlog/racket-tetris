@@ -14,10 +14,7 @@
                                    (or (shape-name/c (string->symbol (string ch)))
                                        (equal? ch #\.)))))
                        (listof block?))]
-  [block-move (-> block? posn? block?)]
-  [blocks-max-x (-> (listof block?) number?)]
-  [blocks-min-x (-> (listof block?) number?)]
-  [blocks-min-y (-> (listof block?) number?)]))
+  [block-move (-> block? posn? block?)]))
 
 
 ; -------------------------------
@@ -138,16 +135,3 @@
      (λ () (block-move (block (make-posn 0 0) (cons 'L 'normal))
                        (make-posn -1 0))))
     ))
-
-
-(define (blocks-max-x bl)
-  (apply max (for/list ([b bl])
-               (posn-x (block-posn b)))))
-
-(define (blocks-min-x bl)
-  (apply min (for/list ([b bl])
-               (posn-x (block-posn b)))))
-
-(define (blocks-min-y bl)
-  (apply min (for/list ([b bl])
-               (posn-y (block-posn b)))))

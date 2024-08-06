@@ -7,11 +7,12 @@
 (require "playfield.rkt")
 (require "block.rkt")
 (require "shapes.rkt")
-
+(require "draw-utils.rkt")
 
 (define BLOCK-W 20)
 (define VANISH-ZONE-H 2)
 (define GARBAGE-COLOR (make-color 156 154 154))
+(define GHOST-ALPHA 0.3)
 
 (provide
  playfield-canvas-size
@@ -25,8 +26,9 @@
   (cond
     [(equal? 'garbage bt) GARBAGE-COLOR]
     [else
-     (define sname (car bt))
-     (hash-ref SHAPE-COLOR sname)]))
+     (define shape-color (hash-ref SHAPE-COLOR (car bt)))
+     (cond [(equal? 'normal (cdr bt)) shape-color]
+           [(equal? 'ghost (cdr bt)) (set-alpha shape-color GHOST-ALPHA)])]))
 
 
 ;; Playfield DC -> #:void

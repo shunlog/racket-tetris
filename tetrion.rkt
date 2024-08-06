@@ -52,7 +52,7 @@
   [tetrion? (-> any/c boolean?)]
 
   ;; Accessors
-  [tetrion-playfield (-> tetrion? playfield?)]
+  [tetrion-playfield (->* (tetrion?) (boolean?) playfield?)]
 
   ;; Movement
   [tetrion-drop (-> tetrion? tetrion?)]
@@ -64,9 +64,7 @@
 
   ;; Other
   [tetrion-lock (-> tetrion? tetrion?)]
-  [tetrion-spawn (->* (tetrion?)
-                      (shape-name/c)
-                      tetrion?)]))
+  [tetrion-spawn (->* (tetrion?) (shape-name/c) tetrion?)]))
 
 
 ; -------------------------------
@@ -134,16 +132,16 @@
   (define cols (~> tn tetrion-locked playfield-cols))
   (define rows (~> tn tetrion-locked playfield-rows))
 
-  (define shape-blocks (shape-name->blocks shape-name rotation))
-  (define piece-width (add1 (- (blocks-max-x shape-blocks)
-                               (blocks-min-x shape-blocks))))
+  (define shape-posns (shape-name->posns shape-name rotation))
+  (define piece-width (add1 (- (apply max (map posn-x shape-posns))
+                               (apply min (map posn-x shape-posns)))))
   (define leftmost-x (floor (/ (- cols piece-width) 2)))
   (define piece-x (or x
-                      (- leftmost-x (blocks-min-x shape-blocks))))
+                      (- leftmost-x (apply min (map posn-x shape-posns)))))
   ;; the lowest blocks should spawn on the first line of the vanish zone,
   ;; so if there are 20 rows, it should spawn on row with index 20 (0-based)
   (define piece-y (or y
-                      (- rows (blocks-min-y shape-blocks))))  
+                      (- rows (apply min (map posn-y shape-posns)))))  
   (define new-piece
     (piece (make-posn piece-x piece-y) shape-name rotation))
   (cond
@@ -222,37 +220,59 @@
 
 
 ;; Return the blocks representing a Piece
-;; by adding the piece's position to each block representing its shape
-(define (piece-blocks piece)
+;; by adding the piece's position to each block representing its shape.
+;; If ghost? is true, set the block type appropriately
+(define (piece-blocks piece [ghost? #f])
   (cond
     [(not piece) '()]
     [else (define sname (piece-shape-name piece))
           (define rot (piece-rotation piece))
-          (define blocks-at-origin (shape-name->blocks sname rot))
-          (for/list ([blck blocks-at-origin])
-            (block-move blck (piece-posn piece)))]))
-
+          (for/list ([pos (shape-name->posns sname rot)])
+            (~> (block pos (cons sname (if ghost? 'ghost 'normal)))
+                (block-move (piece-posn piece))))]))
 
 
 ; Tetrion -> Playfield
-(define (tetrion-playfield tn)
-  (define piece (tetrion-piece tn))
-  (playfield-add-blocks
-   (tetrion-locked tn)
-   (piece-blocks piece)))
+; Return the playfield with all the blocks combined: locked, piece and ghost (if specified)
+(define (tetrion-playfield tn [ghost? #f])
+  (define (add-piece-blocks plf)
+    (playfield-add-blocks plf (piece-blocks (tetrion-piece tn))))
+  (define (add-ghost-blocks plf)
+    (define ghost-piece (~> (tetrion-hard-drop tn) tetrion-piece))
+    (playfield-add-blocks-maybe plf (piece-blocks ghost-piece #t)))
+
+  (define plf-locked (tetrion-locked tn))
+  (define locked+piece (add-piece-blocks plf-locked))
+  (if ghost?
+      (add-ghost-blocks locked+piece)
+      locked+piece))
 
 
 (module+ test
+  (define ft1 (~> (new-tetrion #:cols 4 #:rows 1)
+                  (tetrion-spawn 'T)))
+  (define piece-blocks1
+    (strings->blocks '(".T."
+                       "TTT"
+                       "...")))
+  (define piece+ghost-blocks1
+    (append piece-blocks1
+            (list (block (make-posn 0 0) '(T . ghost))
+                  (block (make-posn 1 0) '(T . ghost))
+                  (block (make-posn 2 0) '(T . ghost)))))
+
   (test-case
-      "Get playfield immediately after lock, with null Piece"
-    (define ft1 (~> (new-tetrion #:cols 4 #:rows 2)
-                    (tetrion-spawn 'T) 
-                    tetrion-hard-drop
-                    tetrion-lock))
+      "Get Tetrion playfield without ghost piece blocks"
+    
     (check block-lists=?
            (playfield-blocks (tetrion-playfield ft1))
-           (strings->blocks '(".T."
-                              "TTT")))))
+           piece-blocks1))
+
+  (test-case
+      "Get Tetrion playfield with ghost piece blocks"
+    (check block-lists=?
+           (playfield-blocks (tetrion-playfield ft1 #t))
+           piece+ghost-blocks1)))
 
 
 ; Tetrion Posn -> Tetrion
@@ -514,14 +534,13 @@
 ; and clears the full rows.
 ; Raises error on lock out, when all its blocks are in the vanish zone.
 (define (tetrion-lock tn)
-  (define piece (tetrion-piece tn))
   (define rows (playfield-rows (tetrion-locked tn)))
-  (define piece-min-y
-    (+ (posn-y (piece-posn piece))
-       (shape-gap-below (piece-shape-name piece))))
+  (define piece-min-y (~> (tetrion-piece tn)
+                          (piece-blocks)
+                          (map (λ (b) (posn-y (block-posn b))) _)
+                          (apply min _)))
   (cond
-    [(>= (blocks-min-y (piece-blocks piece))
-         rows)
+    [(>= piece-min-y rows)
      (error "All piece blocks above ceiling: lock out")]
     [else
      (define piece-blcks (~> tn tetrion-piece piece-blocks))

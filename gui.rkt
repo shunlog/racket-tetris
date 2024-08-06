@@ -133,7 +133,7 @@
        [style '(border)]
        [paint-callback
         (lambda (canvas dc)
-          (draw-playfield (~> tetris tetris-tn tetrion-playfield) dc))]))
+          (draw-playfield (~> tetris tetris-tn (tetrion-playfield #t)) dc))]))
 
 
 (new timer%

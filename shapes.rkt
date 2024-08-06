@@ -8,17 +8,13 @@
 (require lang/posn)
 (require "utils.rkt")
 
-(lazy-require ["block.rkt" (block block?)])
-
 
 (provide
  SHAPE-COLOR
  (contract-out
   [SHAPE-NAMES (listof symbol?)]
   [shape-name/c contract?]
-  [shape-name->blocks (-> shape-name/c rotation? (listof block?))]
-  [shape-width (-> shape-name/c natural-number/c)]
-  [shape-gap-below (-> shape-name/c natural-number/c)]
+  [shape-name->posns (-> shape-name/c rotation? (listof posn?))]
   [shape-generator? contract?]
   [kick-data (-> shape-name/c rotation? rotation?
                  (listof (list/c integer? integer?)))]
@@ -112,10 +108,9 @@
          SHAPE-NAMES))))
 
 
-; ShapeName Rotation -> (Listof Block)
-; Return the list of blocks a ShapeName is composed of,
-; with its position at the origin (0, 0)
-(define (shape-name->blocks shape-name [rotation 0])
+; ShapeName Rotation -> (Listof Posn)
+; Return the list of Posns that represent the blocks' offset from the origin (0, 0)
+(define (shape-name->posns shape-name [rotation 0])
   (define shape (hash-ref h-shapes-rot (list shape-name rotation)))
   (for/fold ([accum '()])
             ([y (in-naturals)]
@@ -124,17 +119,17 @@
             (for/list ([bool row]
                        [x (in-naturals)]
                        #:when bool)
-              (block (make-posn x y) (cons shape-name 'normal))))))
+              (make-posn x y)))))
 
 (module+ test
   (test-case
-      "Shape name to blocks"
+      "Shape name to Posns"
     (check block-lists=?
-           (shape-name->blocks 'L 3)
-           (list (block (make-posn 1 0) '(L . normal))
-                 (block (make-posn 1 1) '(L . normal))
-                 (block (make-posn 0 2) '(L . normal))
-                 (block (make-posn 1 2) '(L . normal))))))
+           (shape-name->posns 'L 3)
+           (list (make-posn 1 0)
+                 (make-posn 1 1)
+                 (make-posn 0 2)
+                 (make-posn 1 2)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -150,36 +145,6 @@
 (define 7-loop-shape-generator
   (sequence->repeated-generator '(L J S Z O I T)))
 
-
-;;;;;;;;;;;;;;;;;
-;; Shape utils ;;
-;;;;;;;;;;;;;;;;;
-
-
-; ShapeName -> Natural
-; Remember that a Shape is a matrix,
-; so no matter the rotation, the width is the same
-(define (shape-width shape-name)
-  (length (hash-ref h-shapes shape-name)))
-
-
-; ShapeName -> Natural
-; We want to spawn each piece such that its bottom blocks are at level 21,
-; so 21 minus this gap will be the position we want to spawn the piece at
-(define (shape-gap-below shape-name)
-  (define shape (hash-ref h-shapes-rot (list shape-name 0)))
-  (for/first ([row (reverse shape)]
-              [y (in-naturals)]
-              #:when (member #t row))
-    
-    y))
-
-(module+ test
-  (test-case
-      "shape-gap-below"
-    (check-equal? (shape-gap-below 'L) 1)
-    (check-equal? (shape-gap-below 'O) 0)
-    (check-equal? (shape-gap-below 'I) 2)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Rotation kicks data ;;

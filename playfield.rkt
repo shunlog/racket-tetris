@@ -22,6 +22,7 @@
   [playfield-can-place? (-> playfield? (or/c block? (listof block?)) boolean?)]
   [playfield-add-block (-> playfield? block? playfield?)]
   [playfield-add-blocks (-> playfield? (listof block?) playfield?)]
+  [playfield-add-blocks-maybe (-> playfield? (listof block?) playfield?)]
 
   ;; Get a list of Blocks in the Playfield
   [playfield-blocks (-> playfield? (listof block?))]
@@ -145,8 +146,10 @@
 
 
 ; Playifeld List[Block] -> Playfield
+; Raises exception if at least one block can't be added.
 (define (playfield-add-blocks p bl)
   (foldl (λ (b p) (playfield-add-block p b)) p bl))
+
 
 
 (module+ test
@@ -189,6 +192,30 @@
     (define b0 (block (make-posn 0 3) (cons 'L 'normal)))
     (check-not-exn
      (λ () (playfield-add-block plf0 b0))))
+)
+
+
+; Like playfield-add-blocks,
+; but doesn't raise an exception when any block can't be added,
+; and instead tries to add as many as possible
+(define (playfield-add-blocks-maybe plf bl)
+  (for/fold ([plf-res plf])
+            ([b bl])
+    (with-handlers ([exn:fail? (λ (_) plf-res)])
+      (playfield-add-block plf-res b))))
+
+
+(module+ test
+  (test-case
+      "Add some blocks to the Playfield"
+    (define B1 (block (make-posn 1 1) (cons 'L 'normal)))
+    (define B2 (block (make-posn 1 2) (cons 'J 'normal)))
+    (define B3 (block (make-posn 1 3) (cons 'J 'normal)))
+    (define pl0 (~> (empty-playfield 10 20)
+                    (playfield-add-block B2)))
+    (check block-lists=?
+           (playfield-blocks (playfield-add-blocks-maybe pl0 (list B1 B2 B3)))
+           (list B1 B2 B3)))
 )
 
 
