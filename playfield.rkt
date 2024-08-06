@@ -35,6 +35,7 @@
 ; Requires
 
 
+(require threading)
 (require "utils.rkt")
 (require "block.rkt")
 
@@ -46,7 +47,7 @@
 ; A Playfield is a Struct:
 ; - cols: natural
 ; - rows: natural
-; - bset (blocks data)
+; - block-hash: hash mapping (cons nat nat) -> block
 (struct playfield [cols rows block-hash])
 
 
@@ -198,3 +199,19 @@
 ; Playfield -> Playfield
 (define (playfield-clear-lines p)
   p)
+
+(module+ test
+  (test-case
+      "Clear lines"
+    (define plf0 (~> (empty-playfield 2 3)
+                     (playfield-add-blocks
+                      (strings->blocks '(".S"
+                                         ".."
+                                         "II"
+                                         "J."
+                                         "LL")))))
+    (check block-lists=?
+           (playfield-blocks (playfield-clear-lines plf0))
+           (strings->blocks '(".S"
+                              ".."
+                              "J.")))))
