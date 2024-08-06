@@ -74,7 +74,7 @@
 ; Natural, Natural -> Playfield
 (define (empty-playfield [cols 10] [rows 20])
   (playfield cols rows
-             (build-list (* 2 rows)
+             (build-list (max (+ rows 20) (* 2 rows)) ; at least 20 blocks of vanish zone, or double
                          (λ (_) (build-list cols
                                             (λ (_) #f))))))
 
@@ -118,7 +118,7 @@
     (define row (list-ref m y))
     (cond
       [(>= x (playfield-cols plf)) #f]
-      [(>= y (* 2 (playfield-rows plf))) #f]
+      [(>= y (length m)) #f]
       [(not (list-ref row x)) #t]
       [else #f]))
   
@@ -194,8 +194,20 @@
 
 
 ; Playfield -> Playfield
-(define (playfield-clear-lines p)
-  p)
+(define (playfield-clear-lines plf)
+  (define cols (playfield-cols plf))
+  (define m (playfield-m plf))
+  (define (full-row? r)
+    (andmap (λ (v) v) r))
+  (define filtered-m
+    ;; filter the full rows
+    (for/list ([row m] #:unless (full-row? row)) row))
+  (define new-m
+    ;; add back empty rows above
+    (append filtered-m
+            (build-list (- (length m) (length filtered-m))
+                        (λ (_) (build-list cols (λ (_) #f))))))
+  (struct-copy playfield plf [m new-m]))
 
 (module+ test
   (test-case
@@ -208,8 +220,11 @@
                               "II"
                               "J."
                               "LL")))))
+    (define plf-cleared (playfield-clear-lines plf0))
     (check block-lists=?
-           (playfield-blocks (playfield-clear-lines plf0))
+           (playfield-blocks plf-cleared)
            (strings->blocks '(".S"
                               ".."
-                              "J.")))))
+                              "J.")))
+    (check-equal? (length (playfield-m  plf-cleared))
+                  (length (playfield-m plf0)))))

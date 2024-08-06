@@ -245,7 +245,7 @@
 (module+ test
   (test-case
       "Get playfield immediately after lock, with null Piece"
-    (define ft1 (~> (new-tetrion #:cols 3 #:rows 2)
+    (define ft1 (~> (new-tetrion #:cols 4 #:rows 2)
                     (tetrion-spawn 'T) 
                     tetrion-hard-drop
                     tetrion-lock))
@@ -510,7 +510,8 @@
 
 
 ; Tetrion -> Tetrion
-; Locks piece (adds the blocks to `locked`) and clears it (sets it to #f).
+; Locks piece (adds the blocks to `locked`) and clears it (sets it to #f),
+; and clears the full rows.
 ; Raises error on lock out, when all its blocks are in the vanish zone.
 (define (tetrion-lock tn)
   (define piece (tetrion-piece tn))
@@ -523,11 +524,11 @@
          rows)
      (error "All piece blocks above ceiling: lock out")]
     [else
+     (define piece-blcks (~> tn tetrion-piece piece-blocks))
      (define new-locked
-       (~> tn
-           tetrion-piece
-           piece-blocks
-           (playfield-add-blocks (tetrion-locked tn) _)))
+       (~> (tetrion-locked tn)
+           (playfield-add-blocks  piece-blcks)
+           (playfield-clear-lines)))
      (struct-copy tetrion tn
                   [locked new-locked]
                   [piece #f])]))
