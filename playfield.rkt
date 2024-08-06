@@ -133,9 +133,8 @@
 
 ; Playfield Block -> Playfield
 (define (playfield-add-block plf block)
-  (if (not (playfield-can-place? plf block))
-      (error "Can't place block: " block)
-      #f)  
+  (unless (playfield-can-place? plf block)
+    (error "Can't place block: " block))  
   (define-values (x y) (values (posn-x (block-posn block))
                                (posn-y (block-posn block))))
   (define m (playfield-m plf))

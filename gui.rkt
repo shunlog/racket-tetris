@@ -66,9 +66,9 @@
         (if pressed? kc (send event get-key-release-code)))
       (define was-pressed? (hash-ref keys-state-hash key-code #f))
 
-      (if (and was-pressed? pressed?)
-          #f                          ; auto-key / autofire, ignore event
-          (on-tetris-event event))    ; else pass event to tetris
+      ;; only pass event to tetris if not an autofire
+      (unless (and was-pressed? pressed?)
+        (on-tetris-event event))
 
       (hash-set! keys-state-hash key-code pressed?)
       #f  ;; return #f to pass the event further
