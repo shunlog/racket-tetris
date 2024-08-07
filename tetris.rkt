@@ -79,9 +79,9 @@
 (define (new-tetris ms
                     #:rows [rows 20]
                     #:cols [cols 10]
-                    #:tetrion [tetrion (new-tetrion #:rows rows #:cols cols)])
-  (~> (tetris tetrion (hash) ms 0 0 '(0 0 0 0 0))
-      (tetris-spawn ms)))
+                    #:tetrion [tetrion (~> (new-tetrion #:rows rows #:cols cols)
+                                           tetrion-spawn)])
+  (~> (tetris tetrion (hash) ms 0 0 '(0 0 0 0 0))))
 
 
 ;; Set the state and time of the last key press/release
@@ -175,19 +175,21 @@
 
 
 (module+ test
-  (define t0 (new-tetris 0 #:tetrion (~> (new-tetrion #:rows 2)
-                                         (tetrion-spawn 'L))))
-
-  ;; Assert that we got the expected shape
-  (check block-lists=?
-         (~> t0 tetris-tn tetrion-playfield playfield-blocks)
-         (strings->blocks '(".....L...."
-                            "...LLL...."
-                            ".........."
-                            "..........")))
-
   (test-case
-      "Gravity drop one row"
+      "Gravity drop on tick"
+    (define t0
+      (new-tetris 0 #:tetrion (~> (new-tetrion #:rows 2)
+                                  (tetrion-spawn-shape 'L))))
+
+    ;; Assert that we got the expected shape
+    (check block-lists=?
+           (~> t0 tetris-tn tetrion-playfield playfield-blocks)
+           (strings->blocks '(".....L...."
+                              "...LLL...."
+                              ".........."
+                              "..........")))
+
+    ;; Gravity drop one row
     (define t1 (tetris-gravity-tick t0 (+ 2 MS/DROP)))
     (check block-lists=?
            (~> t1 tetris-tn tetrion-playfield playfield-blocks)
@@ -195,10 +197,9 @@
                               ".....L...."
                               "...LLL...."
                               "..........")))
-    (check-equal? (tetris-t-drop t1) MS/DROP))
+    (check-equal? (tetris-t-drop t1) MS/DROP)
 
-  (test-case
-      "Gravity drop two rows in a tick"
+    ;; Gravity drop two rows in a tick
     (define t2 (tetris-gravity-tick t0
                                     (+ 1 (inexact->exact (* 2 MS/DROP)))))
     (check
@@ -208,10 +209,9 @@
                         ".........."
                         ".....L...."
                         "...LLL....")))
-    (check-equal? (tetris-t-drop t2) (* 2 MS/DROP)))
+    (check-equal? (tetris-t-drop t2) (* 2 MS/DROP))
 
-  (test-case
-      "Don't gravity drop when not enough time has passed"
+    ;; Don't gravity drop when not enough time has passed
     (define t3 (tetris-gravity-tick t0 (inexact->exact (* 0.5 MS/DROP))))
     (check
      block-lists=?
@@ -224,11 +224,8 @@
   )
 
 
-(define (tetris-spawn t ms [shape-name #f])
-  (define tn (tetris-tn t))
-  (define new-tn (if shape-name
-                     (tetrion-spawn tn shape-name)
-                     (tetrion-spawn tn)))
+(define (tetris-spawn t ms)
+  (define new-tn (tetrion-spawn (tetris-tn t)))
   (struct-copy tetris t [tn new-tn] [t-drop ms]))
 
 

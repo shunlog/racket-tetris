@@ -18,6 +18,7 @@
 
 (require threading)
 (require racket/gui)
+(require pict)
 (require "tetris.rkt")
 (require "draw.rkt")
 (require "tetrion.rkt")
@@ -112,29 +113,68 @@
   ;; because the frame isn't drawn to the screen until the frame buffer was completed,
   ;; so there are less calls to Xorg.
   ;; For more info, see docs on gui/Windowing/1.7 Animation in Canvases
-  (send tetris-canvas refresh-now))
+  (send tetris-canvas refresh-now)
+  (send queue-canvas refresh-now))
 
 
 ;; ----------------------------
 ;; GUI
 
+(define-values (tw th)
+  (playfield-canvas-size (tetrion-playfield (tetris-tn tetris))))
 
-(define-values (w h) (playfield-canvas-size (tetrion-playfield (tetris-tn tetris))))
+(define-values (qw qh)
+  (~> tetris
+      tetris-tn
+      tetrion-queue
+      queue-pict
+      ((λ (pic) (values (pict-width pic) (pict-height pic))))))
+
 (define frame
   (new tetris-frame%
        [label FRAME-LABEL]
-       [width w]
-       [height h]))
+       [width (+ tw qw)]
+       [height (max th qh)]))
+
+(define margin-container
+  (new pane%
+       [parent frame]
+       [border 20]
+       [alignment '(center top)]))
+
+(define horiz-pane
+  (new horizontal-pane%
+       [parent margin-container]
+       [spacing 20]
+       [alignment '(center top)]))
 
 
 (define tetris-canvas
   (new canvas%
-       [parent frame]
+       [parent horiz-pane]
        [style '(border)]
+       [min-width tw]
+       [min-height th]
+       [stretchable-width #f]
+       [stretchable-height #f]
        [paint-callback
         (lambda (canvas dc)
           (draw-playfield (~> tetris tetris-tn (tetrion-playfield #t)) dc))]))
 
+
+(define queue-canvas
+  (new canvas%
+       [parent horiz-pane]
+       [style '(border)]
+       [min-width qw]
+       [min-height qh]
+       [stretchable-width #f]
+       [stretchable-height #f]
+       [paint-callback
+        (lambda (canvas dc)
+          (define queue (~> tetris tetris-tn tetrion-queue))
+          (define pic (queue-pict queue))
+          (draw-pict pic dc 0 0))]))
 
 (new timer%
      [notify-callback on-tetris-tick]
