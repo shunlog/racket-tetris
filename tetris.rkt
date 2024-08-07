@@ -60,10 +60,18 @@
 
 ;; A Tetris is a struct:
 ;;   - tn: Tetrion
-;;   - t-drop: last time the piece was dropped due to gravity
-;;   - t-dirn: last time when the piece started moving
-;;             (when both direction had been depressed, and one of them was pressed)
-(struct tetris [tn pressed-hash t-drop t-dirn t-autoshift t-ticks])
+;;   - pressed-hash: hash mapping a key to a (cons Boolean Natural],
+;;                   whether it is pressed or not, and the timestamp when it was last pressed/released
+;;   - t-drop: timer for gravity drop, is set to the timestamp of the last drop or spawn
+;;   - t-dirn: timer for autoshift start, set to the timestamp of the last left or right key press
+;;   - t-autoshift: timer for autoshift move, set when autoshft last moved the piece
+;;   - ticks: queue of the timestamps of the last few ticks (to compute the FPS)
+(struct tetris [tn
+                pressed-hash
+                t-drop
+                t-dirn
+                t-autoshift
+                ticks])
 
 
 ; -------------------------------
@@ -264,27 +272,26 @@
   (struct-copy tetris t [tn new-tn]))
 
 
-;; Move in dirn if enough time has passed since previous move
+;; Tetris Natural Direction -> Tetris
+;; Autoshift in the given dirn if enough time has passed since the previous autoshift
 (define (tetris--autoshift t ms dirn)
   (define t-dirn (tetris-t-dirn t))
   (define t-autoshift
     (if (> t-dirn (tetris-t-autoshift t))
         ;; first autoshift since started holding key, starts at this time
         (+ t-dirn AUTOSHIFT-DELAY)
-        (tetris-t-autoshift t)))
-  
+        (tetris-t-autoshift t)))  
   (define times-to-move (quotient (- ms t-autoshift) MS/AUTOSHIFT))
   (define new-t-autoshift (+ t-autoshift (* times-to-move MS/AUTOSHIFT)))
-  (define t-moved
-    (for/fold ([t-acc t])
-              ([i (in-range times-to-move)])
-      (tetris--move t-acc ms dirn)))
-  (struct-copy tetris t-moved
+  (define new-tetris (for/fold ([t-acc t])
+                               ([i (in-range times-to-move)])
+                       (tetris--move t-acc ms dirn)))
+  (struct-copy tetris new-tetris
                [t-autoshift new-t-autoshift]))
 
 
-;; Called each tick,
-;; Start autoshifting if it's time to
+;; Tetris Natural -> Tetris
+;; Start autoshift if enough time has passed since holding a direction key
 (define (tetris-autoshift-tick t ms)
   (define right (tetris--pressed? t 'right))
   (define left (tetris--pressed? t 'left))
@@ -298,21 +305,31 @@
     [else (tetris--autoshift t ms 'left)]))
 
 
+;; Tetris Natural -> Tetris
+;; Update the ticks timestamps list
 (define (tetris-fps-tick t ms)
-  (define ticks (tetris-t-ticks t))
+  (define ticks (tetris-ticks t))
   (define new-ticks (append (cdr ticks) (list ms)))
   (struct-copy tetris t
-               [t-ticks new-ticks]))
+               [ticks new-ticks]))
 
+
+;; Tetris -> Natural
+;; Returns the FPS based on the last few ticks
 (define (tetris-fps t)
-  (define ticks (tetris-t-ticks t))
-  (define dts (for/sum ([t1 ticks]
-                        [t2 (cdr ticks)])
-                (- t2 t1)))
-  (define dt-avg (/ (exact->inexact dts) (sub1 (length ticks))))
+  (define ticks (tetris-ticks t))
+  ;; list of delta times between ticks
+  (define dt-ls (for/sum ([t1 ticks]
+                          [t2 (cdr ticks)])
+                  (- t2 t1)))
+  (define dt-avg (/ (exact->inexact dt-ls) (sub1 (length ticks))))
+  ;; convert average ms to FPS
   (/ 1000.0 dt-avg))
 
-;; Used in big-bang on every tick.
+
+
+;; Tetris Natural -> Tetris
+;; Do everything that needs to happen on a tick
 (define (tetris-on-tick t ms)
   (~> t
       (tetris-fps-tick ms)

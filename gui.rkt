@@ -166,6 +166,9 @@
   (new canvas%
        [parent horiz-pane]
        [style '(border)]
+       ;; Hard-coding the size to the first pict of the preview
+       ;; might fail in case larger shapes will appear later.
+       ;; Ideally the size should fit all the shapes in the bag.
        [min-width qw]
        [min-height qh]
        [stretchable-width #f]
