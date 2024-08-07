@@ -5,9 +5,9 @@
 ;; Constants
 
 (define MS/DROP 1000)               ; ms/cell dropped due to gravity
-(define MS/AUTOSHIFT 40)            ; ms/cell moved during autoshift
-(define AUTOSHIFT-DELAY 180)        ; ms before autoshift starts
-(define MS/SOFT-DROP 50)           ; ms/cell dropped during soft-drop
+(define MS/AUTOSHIFT 25)            ; ms/cell moved during autoshift
+(define AUTOSHIFT-DELAY 133)        ; ms before autoshift starts
+(define MS/SOFT-DROP 20)            ; ms/cell dropped during soft-drop
 
 
 ;; -------------------------------
