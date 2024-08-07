@@ -114,15 +114,11 @@
 
 ; dirn is either 'left or 'right
 (define (tetris--dirn-pressed t ms dirn)
-  (define other-dirn (if (equal? dirn 'right) 'left 'right))
-  (define new-t-dirn (if (tetris--pressed? t other-dirn)
-                         (tetris-t-dirn t)
-                         ms))
   (~> t
       (tetris--move ms dirn)
       (tetris--set-pressed dirn ms #t)
       (struct-copy tetris _
-                   [t-dirn new-t-dirn])))
+                   [t-dirn ms])))
 
 (define (tetris-right-pressed t ms)
   (tetris--dirn-pressed t ms 'right))
