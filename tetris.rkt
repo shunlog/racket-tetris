@@ -8,7 +8,7 @@
 (define MS/AUTOSHIFT 25)            ; ms/cell moved during autoshift
 (define AUTOSHIFT-DELAY 133)        ; ms before autoshift starts
 (define MS/SOFT-DROP 20)            ; ms/cell dropped during soft-drop
-
+(define LOCK-DELAY 500)  ; ms before piece is locked after no movement
 
 ;; -------------------------------
 ;; Provides
@@ -64,11 +64,13 @@
 ;;                   whether it is pressed or not, and the timestamp when it was last pressed/released
 ;;   - t-drop: timer for gravity drop, is set to the timestamp of the last drop or spawn
 ;;   - t-autoshift: timer for autoshift move, set when autoshft last moved the piece
+;;   - t-lock: timer for locking, set to the time of the last successful move, rotation or drop
 ;;   - ticks: queue of the timestamps of the last few ticks (to compute the FPS)
 (struct tetris [tn
                 pressed-hash
                 t-drop
                 t-autoshift
+                t-lock
                 ticks])
 
 
@@ -85,9 +87,9 @@
 (define (new-tetris ms
                     #:rows [rows 20]
                     #:cols [cols 10]
-                    #:tetrion [tetrion (~> (new-tetrion #:rows rows #:cols cols)
-                                           tetrion-spawn)])
-  (~> (tetris tetrion (hash) ms 0 '(0 0 0 0 0))))
+                    #:tetrion [tetrion (~> (new-tetrion #:rows rows #:cols cols))])
+  (~> (tetris tetrion (hash) ms 0 0 '(0 0 0 0 0))
+      (tetris-spawn ms)))
 
 
 ;; Set the state and time of the last key press/release
@@ -109,13 +111,14 @@
 
 ;; call tetrion-move and update the lock timer if successful move
 (define (tetris--move t ms dirn)
-  (define tn (tetris-tn t))
-  (define new-tn
-    (with-handlers ([exn:fail? (λ (e) tn)])
-      (if (equal? dirn 'right)
-          (tetrion-right tn)
-          (tetrion-left tn))))
-  (struct-copy tetris t [tn new-tn]))
+  (with-handlers ([exn:fail? (λ (e) t)])
+    (define tn (tetris-tn t))
+    (define new-tn (if (equal? dirn 'right)
+                       (tetrion-right tn)
+                       (tetrion-left tn)))
+    (struct-copy tetris t
+                 [tn new-tn]
+                 [t-lock ms])))
 
 
 ; dirn is either 'left or 'right
@@ -148,16 +151,25 @@
   (tetris--set-pressed t 'down ms #f))
 
 
+;; Tetris Natural -> Tetris
+;; Assuming the piece is on the ground, lock it if enough time since t-lock has passed
+(define (tetris-try-lock t ms)
+  (define t-since-move (- ms (tetris-t-lock t)))
+  (if (> t-since-move LOCK-DELAY)
+      (tetris-lock t ms)
+      t))
+
+
 ;; Tetris -> Tetris
-;; simply drop the piece,
- ;; and update the t-on-ground
-(define (tetris--drop t)
+;; Drop the piece and update the t-lock.
+;; If the piece can't be dropped, try to lock it
+(define (tetris--drop t ms)
   (define tn (tetris-tn t))
-  (define new-tn
-    (with-handlers ([exn:fail? (λ (e) tn)])
-      (tetrion-drop tn)))
-  (struct-copy tetris t
-               [tn new-tn]))
+  (with-handlers ([exn:fail? (λ (e) (tetris-try-lock t ms))])
+    (define new-tn (tetrion-drop tn))
+    (struct-copy tetris t
+                 [tn new-tn]
+                 [t-lock ms])))
 
 
 ;; Apply gravity or soft-drop if it's time to and "down" is being held.
@@ -172,7 +184,7 @@
   (define (drop-n-times t n)
     (for/fold ([t-acc t])
               ([_ (in-range n)])
-      (tetris--drop t-acc)))
+      (tetris--drop t-acc ms)))
   (~> t
       (drop-n-times times-to-drop)
       (struct-copy tetris _
@@ -229,9 +241,13 @@
   )
 
 
+;; Spawn the next piece, while also resetting the lock and drop timers
 (define (tetris-spawn t ms)
   (define new-tn (tetrion-spawn (tetris-tn t)))
-  (struct-copy tetris t [tn new-tn] [t-drop ms]))
+  (struct-copy tetris t
+               [tn new-tn]
+               [t-drop ms]
+               [t-lock ms]))
 
 
 (define (tetris-lock t ms)
@@ -249,10 +265,11 @@
 
 
 (define (tetris--rotate t cw? ms)
-  (define new-tn
-    (with-handlers ([exn:fail? (λ (e) (tetris-tn t))])
-      (tetrion-rotate (tetris-tn t) cw?)))
-  (struct-copy tetris t [tn new-tn]))
+  (with-handlers ([exn:fail? (λ (e) t)])
+    (define new-tn (tetrion-rotate (tetris-tn t) cw?))
+    (struct-copy tetris t
+                 [tn new-tn]
+                 [t-lock ms])))
 
 
 (define (tetris-rotate-cw t ms)
@@ -323,7 +340,6 @@
   (define dt-avg (/ (exact->inexact dt-ls) (sub1 (length ticks))))
   ;; convert average ms to FPS
   (/ 1000.0 dt-avg))
-
 
 
 ;; Tetris Natural -> Tetris
