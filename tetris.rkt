@@ -63,13 +63,11 @@
 ;;   - pressed-hash: hash mapping a key to a (cons Boolean Natural],
 ;;                   whether it is pressed or not, and the timestamp when it was last pressed/released
 ;;   - t-drop: timer for gravity drop, is set to the timestamp of the last drop or spawn
-;;   - t-dirn: timer for autoshift start, set to the timestamp of the last left or right key press
 ;;   - t-autoshift: timer for autoshift move, set when autoshft last moved the piece
 ;;   - ticks: queue of the timestamps of the last few ticks (to compute the FPS)
 (struct tetris [tn
                 pressed-hash
                 t-drop
-                t-dirn
                 t-autoshift
                 ticks])
 
@@ -89,7 +87,7 @@
                     #:cols [cols 10]
                     #:tetrion [tetrion (~> (new-tetrion #:rows rows #:cols cols)
                                            tetrion-spawn)])
-  (~> (tetris tetrion (hash) ms 0 0 '(0 0 0 0 0))))
+  (~> (tetris tetrion (hash) ms 0 '(0 0 0 0 0))))
 
 
 ;; Set the state and time of the last key press/release
@@ -124,9 +122,8 @@
 (define (tetris--dirn-pressed t ms dirn)
   (~> t
       (tetris--move ms dirn)
-      (tetris--set-pressed dirn ms #t)
-      (struct-copy tetris _
-                   [t-dirn ms])))
+      (tetris--set-pressed dirn ms #t)))
+
 
 (define (tetris-right-pressed t ms)
   (tetris--dirn-pressed t ms 'right))
@@ -174,7 +171,7 @@
   (define new-t-drop (+ t-drop (* times-to-drop drop-rate)))
   (define (drop-n-times t n)
     (for/fold ([t-acc t])
-              ([i (in-range n)])
+              ([_ (in-range n)])
       (tetris--drop t-acc)))
   (~> t
       (drop-n-times times-to-drop)
@@ -272,37 +269,38 @@
   (struct-copy tetris t [tn new-tn]))
 
 
-;; Tetris Natural Direction -> Tetris
-;; Autoshift in the given dirn if enough time has passed since the previous autoshift
-(define (tetris--autoshift t ms dirn)
-  (define t-dirn (tetris-t-dirn t))
-  (define t-autoshift
-    (if (> t-dirn (tetris-t-autoshift t))
-        ;; first autoshift since started holding key, starts at this time
-        (+ t-dirn AUTOSHIFT-DELAY)
-        (tetris-t-autoshift t)))  
-  (define times-to-move (quotient (- ms t-autoshift) MS/AUTOSHIFT))
-  (define new-t-autoshift (+ t-autoshift (* times-to-move MS/AUTOSHIFT)))
-  (define new-tetris (for/fold ([t-acc t])
-                               ([i (in-range times-to-move)])
-                       (tetris--move t-acc ms dirn)))
-  (struct-copy tetris new-tetris
-               [t-autoshift new-t-autoshift]))
-
-
 ;; Tetris Natural -> Tetris
 ;; Start autoshift if enough time has passed since holding a direction key
 (define (tetris-autoshift-tick t ms)
-  (define right (tetris--pressed? t 'right))
-  (define left (tetris--pressed? t 'left))
-  (define autoshift? (and (or right left)
-                          (> (- ms (tetris-t-dirn t)) AUTOSHIFT-DELAY)))
-  (define right-last (> (tetris--pressed-t t 'right) (tetris--pressed-t t 'left)))
-  
+  (define (tetris--move-n-times n dirn)
+    (for/fold ([t-acc t])
+              ([_ (in-range n)])
+      (tetris--move t-acc ms dirn)))
+  ;; Time when a dirn key was last pressed/released
+  (define t-dirn (max (tetris--pressed-t t 'right) (tetris--pressed-t t 'left)))
+
+  ;; Assuming the delay has passed,
+  ;; autoshift in the given dirn if enough time has passed since the previous autoshift
+  (define (autoshift-in-dirn dirn)
+    ;; timestamp of previous autoshift, or of the autoshift start,
+    ;; whichever happened later
+    (define t-autoshift (max (tetris-t-autoshift t) (+ t-dirn AUTOSHIFT-DELAY)))
+    (define t-since-autoshift (- ms t-autoshift))
+    (define times-to-move (quotient t-since-autoshift MS/AUTOSHIFT))
+    (~> (tetris--move-n-times times-to-move dirn)
+        (struct-copy tetris _
+                     [t-autoshift (+ t-autoshift (* times-to-move MS/AUTOSHIFT))])))
+
+  (define right-pressed (tetris--pressed? t 'right))
+  (define left-pressed (tetris--pressed? t 'left))
+  (define delay-passed (> (- ms t-dirn) AUTOSHIFT-DELAY))
+  (define right-event-last (> (tetris--pressed-t t 'right) (tetris--pressed-t t 'left)))
+  (define holding-right (or (not left-pressed) (and right-pressed right-event-last)))
   (cond
-    [(not autoshift?) t]
-    [(or (not left) (and right right-last)) (tetris--autoshift t ms 'right)]
-    [else (tetris--autoshift t ms 'left)]))
+    [(not (or right-pressed left-pressed)) t]
+    [(not delay-passed) t]
+    [holding-right (autoshift-in-dirn 'right)]
+    [else (autoshift-in-dirn 'left)]))
 
 
 ;; Tetris Natural -> Tetris
