@@ -59,7 +59,7 @@
 (define (draw-playfield plf dc)
   (define rows (playfield-rows plf))
   (define cols (playfield-cols plf))
-  (send dc set-brush "gray" 'solid)  
+  (send dc set-brush "gray" 'solid)
   (send dc draw-rectangle 0 0 (* BLOCK-W cols) (* BLOCK-W VANISH-ZONE-H))
   (for ([block (playfield-blocks plf)])
     (define row (posn-y (block-posn block)))
@@ -78,7 +78,7 @@
 
 (module+ test
   (test-case
-      "Drawing two sets of tetrominoes in a 4x10"  
+      "Drawing two sets of tetrominoes in a 4x10"
     (displayln "Drawing two sets of tetrominoes in a 4x10")
     (define plf0
       (~> (empty-playfield 10 5)
@@ -122,8 +122,8 @@
 
 (module+ test
   (test-case
-      "Drawing the piece preview"  
-    (displayln "Drawing the piece preview")    
+      "Drawing the piece preview"
+    (displayln "Drawing the piece preview")
     (shape-pict 'L)
 
     (define sn-ls0 '(L O S J I J))

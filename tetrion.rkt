@@ -149,8 +149,8 @@
 ;; Spawn a Piece according to the specified shape-name.
 ;; If the coordinates are not specified,
 ;; the piece will be centered at the bottom of the vanish zone.
-(define (tetrion-spawn-shape tn 
-                        shape-name 
+(define (tetrion-spawn-shape tn
+                        shape-name
                         #:x [x #f]
                         #:y [y #f]
                         #:rotation [rotation 0])
@@ -166,7 +166,7 @@
   ;; the lowest blocks should spawn on the first line of the vanish zone,
   ;; so if there are 20 rows, it should spawn on row with index 20 (0-based)
   (define piece-y (or y
-                      (- rows (apply min (map posn-y shape-posns)))))  
+                      (- rows (apply min (map posn-y shape-posns)))))
   (define new-piece
     (piece (make-posn piece-x piece-y) shape-name rotation))
   (cond
@@ -290,7 +290,7 @@
 
   (test-case
       "Get Tetrion playfield without ghost piece blocks"
-    
+
     (check block-lists=?
            (playfield-blocks (tetrion-playfield ft1))
            piece-blocks1))
@@ -425,7 +425,7 @@
      (strings->blocks '("OO."
                         "LLL"
                         "LOO")))
-    
+
     )
   )
 
@@ -444,7 +444,7 @@
            (strings->blocks '("IIII"
                               "...."
                               "JJ..")))
-    
+
     ;; Successful move
     (define ft0-drop (tetrion-move ft0 (make-posn 0 -1)))
     (check block-lists=?
@@ -459,21 +459,21 @@
 
     ;; Fail on collision with bottom of playfield
     (define ft1 (~> (new-tetrion #:cols 3 #:rows 0)
-                    (tetrion-spawn-shape 'L)))    
+                    (tetrion-spawn-shape 'L)))
     (check-exn
      exn:fail?
      (λ () (tetrion-move ft1 (make-posn 0 -1))))
 
-    ;; Fail on collision with right border    
+    ;; Fail on collision with right border
     (check-exn
      exn:fail?
      (λ () (tetrion-move ft1 (make-posn 1 0))))
 
-    ;; Fail on collision with left border    
+    ;; Fail on collision with left border
     (check-exn
      exn:fail?
      (λ () (tetrion-move ft1 (make-posn -1 0))))
-    
+
     ;; Should work on new instance
     (define tn-new (~> (new-tetrion) (tetrion-spawn)))
     (check-not-exn
@@ -532,7 +532,7 @@
     (define plf1 (playfield-add-blocks (tetrion-locked ft0)
                                        (strings->blocks '("LL.."))))
     (define ft1 (struct-copy tetrion ft0 [locked plf1]))
-    
+
     ;; assert initial setup
     (check
      block-lists=?
@@ -582,14 +582,14 @@
 
 (module+ test
   (test-case
-      "Lock out if locked right after spawn (since pieces spawn above the ceiling)"    
+      "Lock out if locked right after spawn (since pieces spawn above the ceiling)"
     (define ft0 (~> (new-tetrion )
                     (tetrion-spawn-shape 'L)))
     (check-exn
      #rx"lock out"
      (λ () (tetrion-lock ft0))))
 
-  
+
   (test-case
       "No lock out if at least a single block below ceiling"
     (define tn-dropped

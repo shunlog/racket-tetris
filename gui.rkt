@@ -57,9 +57,9 @@
 (define tetris-frame%
   (class frame%
     (init) (super-new)
-    
+
     (define keys-state-hash (make-hash))
-    
+
     (define/override (on-subwindow-char receiver event)
       (define kc (send event get-key-code))
       (define pressed? (not (equal? 'release kc)))
@@ -185,4 +185,3 @@
 
 
 (send frame show #t)
-

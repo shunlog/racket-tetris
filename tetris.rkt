@@ -25,7 +25,7 @@
                    tetris?)]
   [tetris-tn (-> tetris? tetrion?)]
   [tetris-fps (-> tetris? number?)]
-  
+
   ;; Player actions
   [tetris-left-pressed (-> tetris? natural-number/c tetris?)]
   [tetris-left-released (-> tetris? natural-number/c tetris?)]
@@ -35,7 +35,7 @@
   [tetris-soft-drop-released (-> tetris? natural-number/c tetris?)]
   [tetris-rotate-cw (-> tetris? natural-number/c tetris?)]
   [tetris-rotate-ccw (-> tetris? natural-number/c tetris?)]
-  [tetris-rotate-180 (-> tetris? natural-number/c tetris?)]  
+  [tetris-rotate-180 (-> tetris? natural-number/c tetris?)]
   [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
 
   ;; Big bang on-tick
@@ -177,7 +177,7 @@
   (define drop-rate (if (tetris--pressed? t'down)
                         MS/SOFT-DROP
                         MS/DROP))
-  
+
   (define t-drop (tetris-t-drop t))
   (define times-to-drop (quotient (- ms t-drop) drop-rate))
   (define new-t-drop (+ t-drop (* times-to-drop drop-rate)))
@@ -349,6 +349,3 @@
       (tetris-fps-tick ms)
       (tetris-gravity-tick ms)
       (tetris-autoshift-tick ms)))
-
-
-

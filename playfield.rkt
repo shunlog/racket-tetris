@@ -94,7 +94,7 @@
 
 
 
-(module+ test  
+(module+ test
   (test-case
       "Create an empty Playfield"
     (define plf0 (empty-playfield 8 15))
@@ -122,7 +122,7 @@
       [(>= y (length m)) #f]
       [(not (list-ref row x)) #t]
       [else #f]))
-  
+
   (cond
     [(list? block-or-list)
      (for/and ([block block-or-list])
@@ -135,7 +135,7 @@
 ; Playfield Block -> Playfield
 (define (playfield-add-block plf block)
   (unless (playfield-can-place? plf block)
-    (error "Can't place block: " block))  
+    (error "Can't place block: " block))
   (define-values (x y) (values (posn-x (block-posn block))
                                (posn-y (block-posn block))))
   (define m (playfield-m plf))
@@ -159,7 +159,7 @@
       "Add a block to the Playfield"
     (define pl0 (~> (empty-playfield 10 20)
                     (playfield-add-block B1)))
-    
+
     (check-equal? (playfield-blocks pl0) (list B1)))
 
   (test-case
@@ -185,7 +185,7 @@
     (check-exn
      #rx"pos.*1.*0"
      (λ () (playfield-add-block plf0 b0))))
-  
+
   (test-case
       "Add block in the vanish zone (which is the same size as the active zone)"
     (define plf0 (empty-playfield 1 2))
