@@ -41,7 +41,7 @@
            [(equal? 'ghost (cdr bt)) (set-alpha shape-color GHOST-ALPHA)])]))
 
 
-(define (draw-block b x y dc)
+(define (draw-block b dc x y)
   (define old-brush (send dc get-brush))
   (send dc set-brush (block-color b) 'solid)
   (send dc draw-rectangle x y BLOCK-W BLOCK-W)
@@ -51,7 +51,7 @@
 ;; Block -> Pict
 (define (block-pict b)
   (dc (λ (dc dx dy)
-        (draw-block b dx dy dc))
+        (draw-block b dc dx dy))
       BLOCK-W BLOCK-W))
 
 
@@ -66,7 +66,7 @@
     (define col (posn-x (block-posn block)))
     (define x (* BLOCK-W col))
     (define y (* BLOCK-W (- (+ VANISH-ZONE-H (sub1 rows)) row)))
-    (draw-block block x y dc)))
+    (draw-block block dc x y)))
 
 ;; Get the size of the image for the previous function
 (define (playfield-canvas-size plf)
@@ -78,8 +78,8 @@
 
 (module+ test
   (test-case
-      "Drawing two sets of tetrominoes in a 4x10"
-    (displayln "Drawing two sets of tetrominoes in a 4x10")
+      "Drawing a Playfield with two sets of tetrominoes"
+    (displayln "Drawing a Playfield with two sets of tetrominoes")
     (define plf0
       (~> (empty-playfield 10 5)
           (playfield-add-blocks
@@ -114,6 +114,13 @@
   )
 
 
+(module+ test
+  (test-case
+      "Drawing a shape"
+    (displayln "Drawing a shape")
+    (shape-pict 'L)))
+
+
 ;; [Listof shape-name/c] -> pict
 (define (queue-pict sn-ls)
   (~> (apply vl-append BLOCK-W (map shape-pict sn-ls))
@@ -124,12 +131,5 @@
   (test-case
       "Drawing the piece preview"
     (displayln "Drawing the piece preview")
-    (shape-pict 'L)
-
-    (define sn-ls0 '(L O S J I J))
-    (queue-pict sn-ls0)
-    ;; (define dc (new bitmap-dc% [bitmap (make-bitmap 100 100)]))
-    ;; (draw-preview sn-ls0 dc)
-    ;; (send dc get-bitmap)
-
-    ))
+    (define sn-ls0 '(I J))
+    (queue-pict sn-ls0)))
