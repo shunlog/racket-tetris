@@ -21,6 +21,7 @@
  playfield-canvas-size
  draw-playfield
  queue-pict
+ hold-piece-pict
  )
 
 
@@ -119,6 +120,21 @@
       "Drawing a shape"
     (displayln "Drawing a shape")
     (shape-pict 'L)))
+
+
+;; (or/c #f shape-name) -> pict
+(define (hold-piece-pict sn)
+  (define bg (blank (* 5 BLOCK-W) (* 5 BLOCK-W)))
+  (cond
+    [(not sn) bg]
+    [else (cc-superimpose bg (shape-pict sn))]))
+
+
+(module+ test
+  (test-case
+      "Drawing the hold piece"
+    (displayln "Drawing the hold piece")
+    (hold-piece-pict 'I)))
 
 
 ;; [Listof shape-name/c] -> pict

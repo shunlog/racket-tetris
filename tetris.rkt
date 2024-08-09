@@ -37,6 +37,7 @@
   [tetris-rotate-ccw (-> tetris? natural-number/c tetris?)]
   [tetris-rotate-180 (-> tetris? natural-number/c tetris?)]
   [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
+  [tetris-hold (-> tetris? natural-number/c tetris?)]
 
   ;; Big bang on-tick
   [tetris-on-tick (-> tetris? natural-number/c tetris?)]
@@ -340,6 +341,14 @@
   (define dt-avg (/ (exact->inexact dt-ls) (sub1 (length ticks))))
   ;; convert average ms to FPS
   (/ 1000.0 dt-avg))
+
+
+;; Tetris Natural -> Tetris
+;; Put piece on hold if possible
+(define (tetris-hold t ms)
+  (with-handlers [(exn:fail? (λ (e) t))]
+    (struct-copy tetris t
+                 [tn (tetrion-hold (tetris-tn t))])))
 
 
 ;; Tetris Natural -> Tetris

@@ -87,6 +87,7 @@
       [(#\z) (tetris-rotate-ccw tetris (millis))]
       [(#\a) (tetris-rotate-180 tetris (millis))]
       [(#\space) (tetris-hard-drop tetris (millis))]
+      [(#\c) (tetris-hold tetris (millis))]
       [(down) (tetris-soft-drop-pressed tetris (millis))]
       [(release)
        (case (send key-ev get-key-release-code)
@@ -114,7 +115,8 @@
   ;; so there are less calls to Xorg.
   ;; For more info, see docs on gui/Windowing/1.7 Animation in Canvases
   (send tetris-canvas refresh-now)
-  (send queue-canvas refresh-now))
+  (send queue-canvas refresh-now)
+  (send hold-piece-canvas refresh-now))
 
 
 ;; ----------------------------
@@ -130,11 +132,18 @@
       queue-pict
       ((λ (pic) (values (pict-width pic) (pict-height pic))))))
 
+(define-values (hold-w hold-h)
+  (~> tetris
+      tetris-tn
+      tetrion-on-hold
+      hold-piece-pict
+      ((λ (pic) (values (pict-width pic) (pict-height pic))))))
+
 (define frame
   (new tetris-frame%
        [label FRAME-LABEL]
-       [width (+ tw qw)]
-       [height (max th qh)]))
+       [width (+ tw qw hold-w)]
+       [height (max th qh hold-h)]))
 
 (define margin-container
   (new pane%
@@ -149,6 +158,21 @@
        [alignment '(center top)]))
 
 
+(define hold-piece-canvas
+  (new canvas%
+       [parent horiz-pane]
+       [style '(border)]
+       [min-width hold-w]
+       [min-height hold-h]
+       [stretchable-width #f]
+       [stretchable-height #f]
+       [paint-callback
+        (lambda (canvas dc)
+          (define hold-shape (~> tetris tetris-tn tetrion-on-hold))
+          (define pic (hold-piece-pict hold-shape))
+          (draw-pict pic dc 0 0))]))
+
+
 (define tetris-canvas
   (new canvas%
        [parent horiz-pane]
@@ -160,7 +184,6 @@
        [paint-callback
         (lambda (canvas dc)
           (draw-playfield (~> tetris tetris-tn (tetrion-playfield #t)) dc))]))
-
 
 (define queue-canvas
   (new canvas%

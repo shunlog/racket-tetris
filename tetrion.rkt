@@ -54,6 +54,7 @@
   ;; Accessors
   [tetrion-playfield (->* (tetrion?) (boolean?) playfield?)]
   [tetrion-queue (-> tetrion? (listof shape-name/c))]
+  [tetrion-on-hold (-> tetrion? (or/c #f shape-name/c))]
 
   ;; Movement
   [tetrion-drop (-> tetrion? tetrion?)]
@@ -65,6 +66,7 @@
 
   ;; Other
   [tetrion-lock (-> tetrion? tetrion?)]
+  [tetrion-hold (-> tetrion? tetrion?)]
   [tetrion-spawn (-> tetrion? tetrion?)]
   [tetrion-spawn-shape (-> tetrion? shape-name/c tetrion?)]))
 
@@ -90,7 +92,9 @@
 ; - locked: Playfield of the locked blocks
 ; - shape-generator: shape-generator? - a function with no arguments that returns a shape-name
 ; - queue: [list-of shape-name/c], represents the next piece preview, must have at least 1 element
-(struct tetrion [piece locked shape-generator queue])
+; - on-hold: (or/c #f shape-name/c), represents the hold piece, or lack thereof
+; - can-hold: boolean, false if the current piece was obtained from the hold
+(struct tetrion [piece locked shape-generator queue on-hold can-hold])
 
 
 ; A Piece is either #f or a struct:
@@ -126,13 +130,15 @@
 
 
 ;; Tetrion -> Tetrion
-;; Spawn the popped shape from the queue and push the next generated one
+;; Spawn the shape popped from the queue and push the next generated one
 (define (tetrion-spawn tn)
   (define next-shape (car (tetrion-queue tn)))
   (define new-shape ((tetrion-shape-generator tn)))
   (define new-queue (append (cdr (tetrion-queue tn)) (list new-shape)))
   (~> (tetrion-spawn-shape tn next-shape)
-      (struct-copy tetrion _ [queue new-queue])))
+      (struct-copy tetrion _
+                   [queue new-queue]
+                   [can-hold #t])))
 
 
 (module+ test
@@ -144,6 +150,53 @@
     (define spawned-shape (piece-shape-name (tetrion-piece tn1)))
     (check-equal? spawned-shape next-shape)
     ))
+
+
+;; Tetrion -> Tetrion
+;; If there was a piece on hold, swap it with the current piece,
+;; otherwise put the current on hold, and spawn the next one from the queue
+(define (tetrion-hold tn)
+  (define current-sn (~> tn tetrion-piece piece-shape-name))
+  (define sn-on-hold (~> tn tetrion-on-hold))
+  (cond
+    [(not (tetrion-can-hold tn)) (error "Can't hold piece.")]
+    [(not sn-on-hold)                   ; no piece on hold yet
+     (~> (tetrion-spawn tn)
+         (struct-copy tetrion _ [on-hold current-sn] [can-hold #f]))]
+    [else
+     (~> (tetrion-spawn-shape tn sn-on-hold)
+         (struct-copy tetrion _ [on-hold current-sn] [can-hold #f]))]))
+
+(module+ test
+  (test-case
+      "Hold piece"
+    (define tn0 (~> (new-tetrion) tetrion-spawn))
+    ;; Hold is empty initially
+    (check-equal? (tetrion-on-hold tn0) #f)
+
+    ;; Put the piece on hold, next one should spawn
+    (define shape0 (piece-shape-name (tetrion-piece tn0)))
+    (define shape-q1 (car (tetrion-queue tn0)))
+    (define tn1 (tetrion-hold tn0))
+    (define spawned-shape (piece-shape-name (tetrion-piece tn1)))
+    (check-equal? spawned-shape shape-q1)
+    (check-equal? (tetrion-on-hold tn1) shape0)
+
+    ;; Swap the piece with the one on hold
+    (define tn2 (~> tn1 tetrion-spawn tetrion-spawn))
+    (define tn3 (~> tn2 tetrion-hold))
+    (check-equal? (piece-shape-name (tetrion-piece tn3))
+                  (tetrion-on-hold tn2))
+    (check-equal? (piece-shape-name (tetrion-piece tn2))
+                  (tetrion-on-hold tn3)))
+
+  (test-case
+      "Can't hold twice in a row"
+    (define tn0 (~> (new-tetrion) tetrion-spawn tetrion-hold))
+    (check-exn exn:fail?
+               (λ () (tetrion-hold tn0)))
+    (check-not-exn
+     (λ () (~> tn0 tetrion-spawn tetrion-hold)))))
 
 
 ;; Spawn a Piece according to the specified shape-name.
@@ -243,7 +296,7 @@
   (define locked (~> (empty-playfield cols rows)
                      (playfield-add-blocks locked-blocks)))
   (define queue (build-list queue-size (λ (_) (shape-generator))))
-  (tetrion #f locked shape-generator queue))
+  (tetrion #f locked shape-generator queue #f #t))
 
 
 ;; Return the blocks representing a Piece
