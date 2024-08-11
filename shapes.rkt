@@ -5,6 +5,7 @@
 (require rackunit)
 (require racket/generator)
 (require racket/draw)
+(require racket/list)
 (require lang/posn)
 (require "utils.rkt")
 
@@ -137,13 +138,45 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+;; A ShapeGenerator is a Racket generator that returns a ShapeName on each call
 (define shape-generator?
   (and/c generator? (-> shape-name/c)))
 
 
-;; Guarantees the order and starting shape
+(define 7-tetrominoes-set
+  '(L J S Z O I T))
+
+;; This generator implements the standard Random Generator which permutes bags of 7 tetrominoes:
+;; https://tetris.wiki/Random_Generator
 (define 7-loop-shape-generator
-  (sequence->repeated-generator '(L J S Z O I T)))
+  (generator
+   ()
+   (let loop ([bag '()])
+     (if (null? bag)
+         (loop (shuffle 7-tetrominoes-set))
+         (begin (yield (car bag)) (loop (cdr bag)))))))
+
+
+(module+ test
+  (test-case
+      "The standard Random Generator shuffles bags of 7 tetrominoes"
+    (define ls (build-list 14 (λ (_) (7-loop-shape-generator))))
+    (check-true
+     (block-lists=? (take ls 7) 7-tetrominoes-set))
+    (check-true
+     (block-lists=? (take (drop ls 7) 7) 7-tetrominoes-set)))
+  (test-case
+      "Generator results should be random"
+    (define ls1 (build-list 14 (λ (_) (7-loop-shape-generator))))
+    (define ls2 (build-list 14 (λ (_) (7-loop-shape-generator))))
+    (check-not-equal? ls1 ls2))
+  (test-case
+      "Generator results should be reproducible by seeding the RNG"
+    (random-seed 53)
+    (define ls1 (build-list 14 (λ (_) (7-loop-shape-generator))))
+    (random-seed 53)
+    (define ls2 (build-list 14 (λ (_) (7-loop-shape-generator))))
+    (check-equal? ls1 ls2)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
