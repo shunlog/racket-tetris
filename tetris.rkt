@@ -278,7 +278,9 @@
 
 ;; Spawn the next piece, while also resetting the lock and drop timers
 (define (tetris-spawn t ms)
-  (define new-tn (tetrion-spawn (tetris-tn t)))
+  (define new-tn
+    (with-handlers ([exn:fail? (λ (_) (error "Game over: can't spawn"))])
+      (tetrion-spawn (tetris-tn t))))
   (struct-copy tetris t
                [tn new-tn]
                [t-drop ms]
@@ -286,8 +288,10 @@
 
 
 (define (tetris-lock t ms)
-  (define tn-locked (~> (tetris-tn t)
-                        tetrion-lock))
+  (define tn-locked
+    (with-handlers ([exn:fail? (λ (_) (error "Game over: can't lock"))])
+      (~> (tetris-tn t)
+         tetrion-lock)))
   (~> (struct-copy tetris t [tn tn-locked])
       (tetris-spawn ms)))
 
