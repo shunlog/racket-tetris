@@ -10,7 +10,7 @@
 
 (define FPS 50)
 (define FRAME-LABEL "World")
-
+(define TIMER-INTERVAL (inexact->exact (round (/ 1000 FPS))))
 
 ; -------------------------------
 ; Requires
@@ -38,13 +38,18 @@
       floor
       inexact->exact))
 
+(define (make-new-tetris)
+  (new-tetris (millis)))
+
+
 
 ;; -------------------------------
 ;; State variables
 
 
 ;; The Tetris state will be mutated for simplicity
-(define tetris (new-tetris (millis)))
+(define tetris (make-new-tetris))
+(define game-over? #f)
 
 
 ; -------------------------------
@@ -67,10 +72,16 @@
         (if pressed? kc (send event get-key-release-code)))
       (define was-pressed? (hash-ref keys-state-hash key-code #f))
 
-      ;; only pass event to tetris if not an autofire
-      (unless (and was-pressed? pressed?)
+      (unless (or
+               ;; filter autofire
+               (and was-pressed? pressed?)
+               game-over?)
         (on-tetris-event event))
 
+      (case (send event get-key-code)
+        [(f4) (restart-game)])
+      
+      
       (hash-set! keys-state-hash key-code pressed?)
       #f  ;; return #f to pass the event further
       )))
@@ -80,23 +91,25 @@
 ;; Update the tetris on key press/release
 (define (on-tetris-event key-ev)
   (define new-tetris
-    (case (send key-ev get-key-code)
-      [(left) (tetris-left-pressed tetris (millis))]
-      [(right) (tetris-right-pressed tetris (millis))]
-      [(up #\x) (tetris-rotate-cw tetris (millis))]
-      [(#\z) (tetris-rotate-ccw tetris (millis))]
-      [(#\a) (tetris-rotate-180 tetris (millis))]
-      [(#\space) (tetris-hard-drop tetris (millis))]
-      [(#\c) (tetris-hold tetris (millis))]
-      [(down) (tetris-soft-drop-pressed tetris (millis))]
-      [(release)
-       (case (send key-ev get-key-release-code)
-         [(left) (tetris-left-released tetris (millis))]
-         [(right) (tetris-right-released tetris (millis))]
-         [(down) (tetris-soft-drop-released tetris (millis))])]))
+    (with-handlers ([exn:fail? (λ (_) (game-over))])
+      (case (send key-ev get-key-code)
+        [(left) (tetris-left-pressed tetris (millis))]
+        [(right) (tetris-right-pressed tetris (millis))]
+        [(up #\x) (tetris-rotate-cw tetris (millis))]
+        [(#\z) (tetris-rotate-ccw tetris (millis))]
+        [(#\a) (tetris-rotate-180 tetris (millis))]
+        [(#\space) (tetris-hard-drop tetris (millis))]
+        [(#\c) (tetris-hold tetris (millis))]
+        [(down) (tetris-soft-drop-pressed tetris (millis))]
+        [(release)
+         (case (send key-ev get-key-release-code)
+           [(left) (tetris-left-released tetris (millis))]
+           [(right) (tetris-right-released tetris (millis))]
+           [(down) (tetris-soft-drop-released tetris (millis))])])))
   (if (void? new-tetris)
       (void)
       (set! tetris new-tetris)))
+
 
 
 ;; void -> void
@@ -172,18 +185,11 @@
           (define pic (hold-piece-pict hold-shape))
           (draw-pict pic dc 0 0))]))
 
-
-(define tetris-canvas
-  (new canvas%
+(define main-vert-pane
+  (new vertical-pane%
        [parent horiz-pane]
-       [style '(border)]
-       [min-width tw]
-       [min-height th]
-       [stretchable-width #f]
-       [stretchable-height #f]
-       [paint-callback
-        (lambda (canvas dc)
-          (draw-playfield (~> tetris tetris-tn (tetrion-playfield #t)) dc))]))
+       [spacing 20]
+       [alignment '(center top)]))
 
 (define queue-canvas
   (new canvas%
@@ -202,9 +208,43 @@
           (define pic (queue-pict queue))
           (draw-pict pic dc 0 0))]))
 
-(new timer%
-     [notify-callback on-tetris-tick]
-     [interval (inexact->exact (round (/ 1000 FPS)))])
+(define tetris-canvas
+  (new canvas%
+       [parent main-vert-pane]
+       [style '(border)]
+       [min-width tw]
+       [min-height th]
+       [stretchable-width #f]
+       [stretchable-height #f]
+       [paint-callback
+        (lambda (canvas dc)
+          (draw-playfield (~> tetris tetris-tn (tetrion-playfield #t)) dc))]))
+
+
+(define game-over-msg
+  (new message%
+       [label "Game over! Press F4 to restart."]
+       [parent main-vert-pane]))
+(send game-over-msg show #f)
+
+
+(define tetris-timer
+  (new timer%
+       [notify-callback on-tetris-tick]
+       [interval TIMER-INTERVAL]))
+
+
+(define (game-over)
+  (set! game-over? #t)
+  (send game-over-msg show #t)
+  (send tetris-timer stop))
+
+
+(define (restart-game)
+  (set! tetris (make-new-tetris))
+  (send tetris-timer start TIMER-INTERVAL)
+  (set! game-over? #f)
+  (send game-over-msg show #f))
 
 
 (send frame show #t)
