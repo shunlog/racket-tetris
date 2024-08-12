@@ -1,6 +1,40 @@
 #lang racket/base
 
 
+;; This module defines a Tetris struct and functions that act on it.
+;; It provides the functions corresponding to player actions,
+;; as well as accessors necessary for the drawing and presentation, such tetris-tn (tetrion).
+
+;; Tetris is based on the Tetrion module, which it instantiates in its struct.
+;; While Tetrion is like a state machine that you control step by step,
+;; the Tetris structure introduces the time axis.
+;; It mostly wraps the Tetrion methods, while taking the timestamp of the action into account.
+
+;; Most of the functions that act on it take the current time as an argument.
+;; Besides the functions representing player actions, such as "move left" or "rotate clockwise",
+;; there is the "tick" function, which is supposedly called at least 30 times/second.
+;; The tick function is supposed to be called inside the game loop,
+;; while the action functions are supposed to be called on each key event.
+
+;; However, these functions are not only called live during a game.
+;; This Tetris is deterministic, so it's possible to save and replay games.
+;; To save a game, you need to save two things:
+;;   1. the initial seed for the RNG
+;;   2. for every event/tick, save the function name and the timestamp with which it was called
+;; Then you call these functions again but using the saved timestamps instead of the current ones,
+;; and you will get a perfect replay of that game.
+
+;; Note that some functions can raise an error, which signifies a game over:
+;;   - tetris-on-tick
+;;   - tetris-hard-drop
+;;   - tetris-hold
+
+;; Note: the "*-pressed" and the "*-released" functions assume that
+;; each press is followed by a release, which is not the case with the key autofire events,
+;; so they have to be filtered.
+
+
+
 ;; -------------------------------
 ;; Constants
 
