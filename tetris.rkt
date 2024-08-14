@@ -122,9 +122,9 @@
 (define (new-tetris ms
                     #:rows [rows 20]
                     #:cols [cols 10]
-                    #:tetrion [tetrion (~> (new-tetrion #:rows rows #:cols cols))])
-  (~> (tetris tetrion (hash) ms 0 0 '(0 0 0 0 0))
-      (tetris-spawn ms)))
+                    #:tetrion [tetrion (~> (new-tetrion #:rows rows #:cols cols)
+                                           (tetrion-spawn))])
+  (tetris tetrion (hash) ms ms ms '(0 0 0 0 0)))
 
 
 ;; Set the state and time of the last key press/release
