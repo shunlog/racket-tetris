@@ -39,7 +39,9 @@
       inexact->exact))
 
 (define (make-new-tetris)
-  (new-tetris (millis)))
+  (new-tetris (millis)
+              #:tetrion (~> (new-tetrion #:rows 30 #:cols 50)
+                            (tetrion-add-garbage 20))))
 
 
 

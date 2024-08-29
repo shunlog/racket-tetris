@@ -68,7 +68,9 @@
   [tetrion-lock (-> tetrion? tetrion?)]
   [tetrion-hold (-> tetrion? tetrion?)]
   [tetrion-spawn (-> tetrion? tetrion?)]
-  [tetrion-spawn-shape (-> tetrion? shape-name/c tetrion?)]))
+  [tetrion-spawn-shape (-> tetrion? shape-name/c tetrion?)]
+  [tetrion-add-garbage (-> tetrion? natural-number/c tetrion?)]
+  ))
 
 
 ; -------------------------------
@@ -653,3 +655,10 @@
           tetrion-drop))
     (check-not-exn
      (λ () (tetrion-lock tn-dropped)))))
+
+
+(define (tetrion-add-garbage tion n)
+  (define new-locked
+    (playfield-add-garbage (tetrion-locked tion) n))
+  (struct-copy tetrion tion
+               [locked new-locked]))

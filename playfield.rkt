@@ -23,7 +23,8 @@
   [playfield-add-block (-> playfield? block? playfield?)]
   [playfield-add-blocks (-> playfield? (listof block?) playfield?)]
   [playfield-add-blocks-maybe (-> playfield? (listof block?) playfield?)]
-
+  [playfield-add-garbage (-> playfield? natural-number/c playfield?)]
+  
   ;; Get a list of Blocks in the Playfield
   [playfield-blocks (-> playfield? (listof block?))]
 
@@ -203,6 +204,23 @@
             ([b bl])
     (with-handlers ([exn:fail? (λ (_) plf-res)])
       (playfield-add-block plf-res b))))
+
+
+;; Playfield  Non-zero-Natural -> Playfield
+;; Add `n` lines of garbage to the playfield 
+(define (playfield-add-garbage plf n)
+  (define cols (playfield-cols plf))
+  (define garbage-lines
+    (build-list n (λ (_)
+                    (append
+                     (build-list (sub1 cols) (λ (_) 'garbage))
+                     '(#f)))))
+  (define m (playfield-m plf))
+  (define new-matrix
+    (~> (append garbage-lines m)
+        (take (length m))))
+  (struct-copy playfield plf
+               [m new-matrix]))
 
 
 (module+ test
