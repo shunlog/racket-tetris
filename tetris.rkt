@@ -53,9 +53,7 @@
  (contract-out
   [tetris? (-> any/c boolean?)]
   [new-tetris (->* (natural-number/c)
-                   (#:tetrion tetrion?
-                    #:rows natural-number/c
-                    #:cols natural-number/c)
+                   (#:tetrion tetrion?)
                    tetris?)]
   [tetris-tn (-> tetris? tetrion?)]
   [tetris-fps (-> tetris? number?)]
@@ -87,7 +85,7 @@
 (require "playfield.rkt")
 (require "block.rkt")
 (require "utils.rkt")
-
+(require racket/generator)
 
 ;; ----------------------------
 ;; Definitions
@@ -119,12 +117,14 @@
   (displayln "Running tests."))
 
 
+;; Natural Tetrion -> Tetris
+;; Takes the start time in ms and a tetrion,
+;; spawns the next piece of the tetrion to ensure it not null,
+;; and returns the Tetris instance
 (define (new-tetris ms
-                    #:rows [rows 20]
-                    #:cols [cols 10]
-                    #:tetrion [tetrion (~> (new-tetrion #:rows rows #:cols cols)
-                                           (tetrion-spawn))])
-  (tetris tetrion (hash) ms ms ms '(0 0 0 0 0)))
+                    #:tetrion [tetrion (new-tetrion)])
+  (~> (tetris tetrion (hash) ms ms ms '(0 0 0 0 0))
+      (tetris-spawn ms)))
 
 
 ;; Set the state and time of the last key press/release
@@ -230,8 +230,10 @@
   (test-case
       "Gravity drop on tick"
     (define t0
-      (new-tetris 0 #:tetrion (~> (new-tetrion #:rows 2)
-                                  (tetrion-spawn-shape 'L))))
+      (new-tetris
+       0
+       #:tetrion (~> (new-tetrion #:rows 2
+                                  #:shape-generator (infinite-generator (yield 'L))))))
 
     ;; Assert that we got the expected shape
     (check block-lists=?
