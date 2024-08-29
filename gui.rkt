@@ -8,7 +8,7 @@
 ;; Constants
 
 
-(define FPS 50)
+(define FPS 24)
 (define FRAME-LABEL "World")
 (define TIMER-INTERVAL (inexact->exact (round (/ 1000 FPS))))
 
@@ -41,7 +41,7 @@
 (define (make-new-tetris)
   (new-tetris (millis)
               #:tetrion (~> (new-tetrion #:rows 30 #:cols 50)
-                            (tetrion-add-garbage 20))))
+                            (tetrion-add-garbage 0))))
 
 
 

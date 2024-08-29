@@ -5,11 +5,12 @@
 (require racket/class)
 (require lang/posn)
 (require pict)
+
 (require "playfield.rkt")
 (require "block.rkt")
 (require "shapes.rkt")
 (require "draw-utils.rkt")
-
+(require "tetrion.rkt")
 
 (define BLOCK-W 20)
 (define VANISH-ZONE-H 2)
@@ -92,7 +93,23 @@
     (define-values (w h) (playfield-canvas-size plf0))
     (define dc (new bitmap-dc% [bitmap (make-bitmap w h)]))
     (draw-playfield plf0 dc)
-    (send dc get-bitmap)))
+    (send dc get-bitmap))
+
+  (test-case
+      "Draw a large playfield"
+    (define (time-drawing-playfield rows cols)
+      (define large-tion
+        (~> (new-tetrion #:rows rows #:cols cols)
+            (tetrion-add-garbage rows)))
+      (define plf (tetrion-playfield large-tion))
+      (define-values (w h) (playfield-canvas-size plf))
+      (define dc (new bitmap-dc% [bitmap (make-bitmap w h)]))
+      (time (draw-playfield plf dc)))
+    (for ([rows '(10 100 100)]
+          [cols '(10 10 100)])
+      (display (format "~a blocks: " (* rows cols)))
+      (time-drawing-playfield rows cols))
+    ))
 
 
 ;; shape-name/c -> pict
