@@ -3,8 +3,10 @@
 (require threading)
 (require racket/draw)
 (require racket/class)
+(require racket/gui/base)
 (require lang/posn)
 (require pict)
+(require profile)
 
 (require "playfield.rkt")
 (require "block.rkt")
@@ -103,13 +105,23 @@
             (tetrion-add-garbage rows)))
       (define plf (tetrion-playfield large-tion))
       (define-values (w h) (playfield-canvas-size plf))
-      (define dc (new bitmap-dc% [bitmap (make-bitmap w h)]))
+      (define dc (new bitmap-dc% [bitmap (make-screen-bitmap w h)]))
       (time (draw-playfield plf dc)))
     (for ([rows '(10 100 100)]
           [cols '(10 10 100)])
       (display (format "~a blocks: " (* rows cols)))
-      (time-drawing-playfield rows cols))
-    ))
+      (time-drawing-playfield rows cols)))
+
+  ;; (test-case
+  ;;     "Profile playfield drawing"
+  ;;   (define large-tion
+  ;;     (~> (new-tetrion #:rows 100 #:cols 1000)
+  ;;         (tetrion-add-garbage 100)))
+  ;;   (define plf (tetrion-playfield large-tion))
+  ;;   (define-values (w h) (playfield-canvas-size plf))
+  ;;   (define dc (new bitmap-dc% [bitmap (make-bitmap w h)]))
+  ;;   (profile-thunk (λ () (draw-playfield plf dc))))
+  )
 
 
 ;; shape-name/c -> pict
