@@ -48,8 +48,10 @@
 
 
 (define (block-type-pict bt)
-  (filled-rectangle BLOCK-W BLOCK-W
-                    #:color (block-color bt) #:border-color "black" #:border-width 1))
+  (cc-superimpose
+   (filled-rectangle BLOCK-W BLOCK-W
+                     #:color (block-color bt) #:border-color "black" #:border-width 1)
+   (rectangle (- BLOCK-W 4) (- BLOCK-W 3))))
 
 ;; Use hash so it uses (equal?) to compare values,
 ;; Otherwise comparing BlockTypes (which are cons) would return false
@@ -71,13 +73,29 @@
 
 (module+ test
   (test-case
-      "Drawing a Playfield with two sets of tetrominoes"
-    (displayln "Drawing a Playfield with two sets of tetrominoes")
+      "Drawing a small Playfield"
+    (displayln "Drawing a small Playfield")
     (define plf0
       (~> (empty-playfield 3 3)
           (playfield-add-blocks
            (strings->blocks '(".I" "J.")))))
     (playfield-pict plf0))
+
+  (test-case
+      "Drawing a Playfield with two sets of tetrominoes"
+    (displayln "Drawing a Playfield with two sets of tetrominoes")
+    (define plf0
+      (~> (empty-playfield 10 5)
+          (playfield-add-blocks
+           (strings->blocks '("..."
+                              "LLLZZIIIII"
+                              "LTTTZZOOJI"
+                              "OOTSSTOOJI"
+                              "OOSSTTTJJI")))))
+    (playfield-pict plf0))
+
+  
+
   
   (test-case
       "Time drawing a large playfield"
