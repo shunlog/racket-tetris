@@ -9,9 +9,10 @@
 
 
 (define FPS 60)
-(define FPS-DRAW 30)
+(define FPS-DRAW 60)
 (define FRAME-LABEL "World")
-
+(define ROWS 20)
+(define COLS 10)
 
 ; -------------------------------
 ; Requires
@@ -41,9 +42,8 @@
 
 (define (make-new-tetris)
   (new-tetris (millis)
-              #:tetrion (~> (new-tetrion #:rows 30 #:cols 20)
-                            (tetrion-add-garbage 20))))
-
+              #:tetrion (~> (new-tetrion #:rows ROWS #:cols COLS)
+                            (tetrion-add-garbage 0))))
 
 
 ;; -------------------------------
@@ -143,9 +143,17 @@
 ;; ----------------------------
 ;; GUI
 
-(define-values (tw th)
-  (playfield-canvas-size (tetrion-playfield (tetris-tn tetris))))
+;; Width and Height of canvases:
 
+;; Main tetris canvas:
+(define-values (tw th)
+  (~> tetris
+      tetris-tn
+      tetrion-playfield
+      playfield-pict
+      ((λ (pic) (values (pict-width pic) (pict-height pic))))))
+
+;; Queue canvas
 (define-values (qw qh)
   (~> tetris
       tetris-tn
@@ -153,6 +161,7 @@
       queue-pict
       ((λ (pic) (values (pict-width pic) (pict-height pic))))))
 
+;; Hold canvas
 (define-values (hold-w hold-h)
   (~> tetris
       tetris-tn
@@ -226,7 +235,9 @@
        [stretchable-height #f]
        [paint-callback
         (lambda (canvas dc)
-          (draw-playfield (~> tetris tetris-tn (tetrion-playfield #t)) dc))]))
+          (define plf (~> tetris tetris-tn (tetrion-playfield #t)))
+          (define pic (playfield-pict plf))
+          (draw-pict pic dc 0 0))]))
 
 
 (define game-over-msg
