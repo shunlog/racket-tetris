@@ -117,6 +117,7 @@
 ;; void -> void
 ;; Update the tetris on a clock tick (called by timer)
 (define (on-tick)
+  (yield)
   (set! tetris (tetris-on-tick tetris (millis)))
   
   ;; refresh-now is different from refresh in that it controls the flushing to the screen,
