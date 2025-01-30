@@ -8,10 +8,10 @@
 ;; Constants
 
 
-(define FPS 80)
+(define FPS 60)
 (define FRAME-LABEL "World")
 (define ROWS 30)
-(define COLS 30)
+(define COLS 10)
 (define GARBAGE-ROWS 20)
 
 ; -------------------------------
