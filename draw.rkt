@@ -7,6 +7,7 @@
 (require racket/gui/base)
 (require lang/posn)
 (require pict)
+(require pict/color)
 (require profile)
 (require memo)
 
@@ -17,8 +18,7 @@
 (require "tetrion.rkt")
 (require "utils.rkt")
 
-(define BLOCK-W 20)
-(define VANISH-ZONE-H 2)
+(define BLOCK-W 32)
 (define GARBAGE-COLOR (make-color 156 154 154))
 (define GHOST-ALPHA 0.3)
 (define VANISH-LINES 2)    ; number of rows to draw in the vanish zone
@@ -48,10 +48,45 @@
 
 
 (define (block-type-pict bt)
-  (cc-superimpose
-   (filled-rectangle BLOCK-W BLOCK-W
-                     #:color (block-color bt) #:border-color "black" #:border-width 1)
-   (rectangle (- BLOCK-W 4) (- BLOCK-W 3))))
+  (define color (block-color bt))
+  (define hw (/ BLOCK-W 2))             ; half width of square
+  (define bw 2)                         ; border width inside square
+  (define lt (lighter color .2))
+  (define dk (darker color .08))
+  (define inner-rects (pin-under
+                 (rectangle hw hw
+                            #:border-color dk
+                            #:border-width bw)
+                 1 1
+                 (rectangle hw hw
+                            #:border-color lt
+                            #:border-width bw))
+    )
+  (define outer-rects (pin-under
+                       (rectangle BLOCK-W BLOCK-W
+                                  #:border-color dk
+                                  #:border-width bw)
+                       1 1
+                       (rectangle BLOCK-W BLOCK-W
+                                  #:border-color lt
+                                  #:border-width bw)))
+  (cond
+    [(equal? bt 'garbage)
+     (filled-rectangle BLOCK-W BLOCK-W
+                       #:color color
+                       #:border-color dk
+                       #:border-width bw)]
+
+    [(equal? (cdr bt) 'normal) (cc-superimpose
+                                (filled-rectangle BLOCK-W BLOCK-W
+                                                  #:color color
+                                                  #:draw-border? #f)
+                                outer-rects
+                                inner-rects)]
+    [else (filled-rectangle BLOCK-W BLOCK-W
+                            #:color color
+                            #:draw-border? #f)])
+  )
 
 ;; Use hash so it uses (equal?) to compare values,
 ;; Otherwise comparing BlockTypes (which are cons) would return false
@@ -62,10 +97,13 @@
   (define rows (playfield-rows plf))
   (define cols (playfield-cols plf))
   (define bl (playfield-block-matrix plf))
-
   (define bt-ls (de-nest (reverse (take bl (+ VANISH-LINES rows)))))
   (ct-superimpose
-   (rectangle (* cols BLOCK-W) (* VANISH-LINES BLOCK-W))
+   (filled-rectangle (* BLOCK-W cols) (* BLOCK-W (+ VANISH-LINES rows))
+                     #:color "black")
+   (rectangle (* cols BLOCK-W) (* VANISH-LINES BLOCK-W)
+              #:border-color "gray"
+              #:border-width 3)
    (table cols (map (λ (bt)
                       (if (not bt) (blank BLOCK-W BLOCK-W) (block-type-bitmap bt)))
                     bt-ls)

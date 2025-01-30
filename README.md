@@ -7,7 +7,7 @@ Due to the clean code it is easy to add new shapes,
 experiment with different playground sizes,
 and save game replays.
 
-![Screenshot](screenshot.png)
+![Screenshot](img/screenshot.png)
 
 Features:
 - [Super Rotation System](https://tetris.wiki/Super_Rotation_System) (wall kicks)

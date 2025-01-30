@@ -8,6 +8,7 @@
  (contract-out
   [alpha-blend (-> (is-a?/c color%) (is-a?/c color%) number? (is-a?/c color%))]
   [darker (->* ((is-a?/c color%)) (number?) (is-a?/c color%))]
+  [lighter (->* ((is-a?/c color%)) (number?) (is-a?/c color%))]
   [set-alpha (-> (is-a?/c color%) number? (is-a?/c color%))]))
 
 
@@ -31,3 +32,5 @@
 ;; Make color darker
 (define (darker color [alpha 0.5])
   (alpha-blend color (make-color 0 0 0) alpha))
+(define (lighter color [alpha 0.5])
+  (alpha-blend color (make-color 255 255 255) alpha))

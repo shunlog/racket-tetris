@@ -10,9 +10,9 @@
 
 (define FPS 60)
 (define FRAME-LABEL "World")
-(define ROWS 30)
+(define ROWS 20)
 (define COLS 10)
-(define GARBAGE-ROWS 20)
+(define GARBAGE-ROWS 10)
 
 ; -------------------------------
 ; Requires
