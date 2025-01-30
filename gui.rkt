@@ -8,11 +8,11 @@
 ;; Constants
 
 
-(define FPS 60)
-(define FPS-DRAW 60)
+(define FPS 80)
 (define FRAME-LABEL "World")
-(define ROWS 20)
-(define COLS 10)
+(define ROWS 30)
+(define COLS 30)
+(define GARBAGE-ROWS 20)
 
 ; -------------------------------
 ; Requires
@@ -43,7 +43,7 @@
 (define (make-new-tetris)
   (new-tetris (millis)
               #:tetrion (~> (new-tetrion #:rows ROWS #:cols COLS)
-                            (tetrion-add-garbage 0))))
+                            (tetrion-add-garbage GARBAGE-ROWS))))
 
 
 ;; -------------------------------
@@ -116,13 +116,9 @@
 
 ;; void -> void
 ;; Update the tetris on a clock tick (called by timer)
-(define (on-physics-tick)
-  (set! tetris (tetris-on-tick tetris (millis))))
-
-
-;; void -> void
-;; Update the tetris on a clock tick (called by timer)
-(define (on-draw-tick)
+(define (on-tick)
+  (set! tetris (tetris-on-tick tetris (millis)))
+  
   ;; refresh-now is different from refresh in that it controls the flushing to the screen,
   ;; rather than letting the system decide when to flush.
   ;; It basically does this:
@@ -247,27 +243,20 @@
 (send game-over-msg show #f)
 
 
-(define tetris-timer
+(define timer
   (new timer%
-       [notify-callback on-physics-tick]
+       [notify-callback on-tick]
        [interval (inexact->exact (round (/ 1000 FPS)))]))
-
-(define draw-timer
-  (new timer%
-       [notify-callback on-draw-tick]
-       [interval (inexact->exact (round (/ 1000 FPS-DRAW)))]))
 
 
 (define (game-over)
   (set! game-over? #t)
-  (send game-over-msg show #t)
-  (send tetris-timer stop))
+  (send game-over-msg show #t))
 
 
 (define (restart-game)
   (set! tetris (make-new-tetris))
-  (send tetris-timer start)
-  (send draw-timer start)
+  (send timer start)
   (set! game-over? #f)
   (send game-over-msg show #f))
 
