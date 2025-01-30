@@ -11,10 +11,10 @@
 
 
 (provide
- SHAPE-COLOR
  (contract-out
   [SHAPE-NAMES (listof symbol?)]
   [shape-name/c contract?]
+  [get-shape-color (-> shape-name/c any/c)]
   [shape-name->posns (-> shape-name/c rotation? (listof posn?))]
   [shape-generator? contract?]
   [kick-data (-> shape-name/c rotation? rotation?
@@ -50,14 +50,17 @@
   (displayln "Running tests."))
 
 
-(define SHAPE-COLOR
+(define COLORS-HASH
   (hash 'L (make-color 255 128 0)
-        'J (make-color 0 132 255)
-        'S (make-color 0 217 51)
-        'Z (make-color 245 7 7)
-        'T (make-color 205 7 245)
-        'I (make-color 0 247 255)
-        'O (make-color 242 235 12)))
+       'J (make-color 0 132 255)
+       'S (make-color 0 217 51)
+       'Z (make-color 245 7 7)
+       'T (make-color 205 7 245)
+       'I (make-color 0 247 255)
+       'O (make-color 242 235 12)))
+
+(define (get-shape-color shape-name)
+  (hash-ref COLORS-HASH shape-name))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Shape matrices with pre-computed rotations ;;

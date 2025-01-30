@@ -40,7 +40,7 @@
   (cond
     [(equal? 'garbage bt) GARBAGE-COLOR]
     [else
-     (define shape-color (hash-ref SHAPE-COLOR (car bt)))
+     (define shape-color (get-shape-color (car bt)))
      (cond [(equal? 'normal (cdr bt)) shape-color]
            [(equal? 'ghost (cdr bt)) (set-alpha shape-color GHOST-ALPHA)])]))
 
