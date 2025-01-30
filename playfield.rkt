@@ -27,7 +27,8 @@
   
   ;; Get a list of Blocks in the Playfield
   [playfield-blocks (-> playfield? (listof block?))]
-
+  [playfield-block-matrix (-> playfield? (listof (listof (or/c block-type/c #f))))]
+  
   ;; Clear completed lines in the Playfield
   [playfield-clear-lines (-> playfield? playfield?)]
   ))
@@ -93,6 +94,10 @@
              [y (in-naturals)])
     (append acc-ls (row-blocks row y))))
 
+; Playfield -> List[List[ (or BlockType #f)]]
+; Note: also returns the vanish zone lines
+(define (playfield-block-matrix plf)
+  (playfield-m plf))
 
 
 (module+ test
