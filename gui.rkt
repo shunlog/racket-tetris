@@ -52,7 +52,6 @@
 
 ;; The Tetris state will be mutated for simplicity
 (define tetris (make-new-tetris))
-(define game-over? #f)
 
 
 ; -------------------------------
@@ -69,21 +68,18 @@
     (define keys-state-hash (make-hash))
 
     (define/override (on-subwindow-char receiver event)
-      (define kc (send event get-key-code))
-      (define pressed? (not (equal? 'release kc)))
+      (define release-kc (send event get-key-code))
+      (define pressed? (not (equal? 'release release-kc)))
       (define key-code
-        (if pressed? kc (send event get-key-release-code)))
+        (if pressed? release-kc (send event get-key-release-code)))
       (define was-pressed? (hash-ref keys-state-hash key-code #f))
 
-      (unless (or
-               ;; filter autofire
-               (and was-pressed? pressed?)
-               game-over?)
+      (unless ;; filter autofire
+          (and was-pressed? pressed?)
         (on-tetris-event event))
 
       (case (send event get-key-code)
         [(f4) (restart-game)])
-      
       
       (hash-set! keys-state-hash key-code pressed?)
       #f  ;; return #f to pass the event further
@@ -119,7 +115,10 @@
 (define (on-tick)
   (yield)
   (set! tetris (tetris-on-tick tetris (millis)))
-  
+  (update-canvases))
+
+
+(define (update-canvases)
   ;; refresh-now is different from refresh in that it controls the flushing to the screen,
   ;; rather than letting the system decide when to flush.
   ;; It basically does this:
@@ -134,7 +133,6 @@
   (send tetris-canvas refresh-now)
   (send queue-canvas refresh-now)
   (send hold-piece-canvas refresh-now))
-
 
 
 ;; ----------------------------
@@ -244,21 +242,23 @@
 (send game-over-msg show #f)
 
 
+
+(define TIMER-INTERVAL (inexact->exact (round (/ 1000 FPS))))
 (define timer
   (new timer%
        [notify-callback on-tick]
-       [interval (inexact->exact (round (/ 1000 FPS)))]))
+       [interval TIMER-INTERVAL]))
 
 
 (define (game-over)
-  (set! game-over? #t)
-  (send game-over-msg show #t))
+  (send timer stop)
+  (send game-over-msg show #t)
+  (update-canvases))
 
 
 (define (restart-game)
   (set! tetris (make-new-tetris))
-  (send timer start)
-  (set! game-over? #f)
+  (send timer start TIMER-INTERVAL)
   (send game-over-msg show #f))
 
 
