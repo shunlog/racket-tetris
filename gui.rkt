@@ -13,6 +13,7 @@
 (define ROWS 20)
 (define COLS 10)
 (define GARBAGE-ROWS 10)
+(define QUEUE-SIZE 5)
 
 ; -------------------------------
 ; Requires
@@ -42,7 +43,7 @@
 
 (define (make-new-tetris)
   (new-tetris (millis)
-              #:tetrion (~> (new-tetrion #:rows ROWS #:cols COLS)
+              #:tetrion (~> (new-tetrion #:rows ROWS #:cols COLS #:queue-size QUEUE-SIZE)
                             (tetrion-add-garbage GARBAGE-ROWS))))
 
 

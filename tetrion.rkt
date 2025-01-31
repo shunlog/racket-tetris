@@ -33,7 +33,8 @@
                     (#:rows natural-number/c
                      #:cols natural-number/c
                      #:shape-generator shape-generator?
-                     #:locked-blocks (listof block?))
+                     #:locked-blocks (listof block?)
+                     #:queue-size natural-number/c)
                     tetrion?)]
   [tetrion? (-> any/c boolean?)]
 
