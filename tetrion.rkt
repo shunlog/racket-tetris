@@ -121,6 +121,17 @@
   (displayln "Running tests."))
 
 
+(define (new-tetrion #:shape-generator [shape-generator 7-loop-shape-generator]
+                     #:cols [cols 10]
+                     #:rows [rows 20]
+                     #:locked-blocks [locked-blocks '()]
+                     #:queue-size [queue-size 5])
+  (define locked (~> (empty-playfield cols rows)
+                     (playfield-add-blocks locked-blocks)))
+  (define queue (build-list queue-size (λ (_) (shape-generator))))
+  (tetrion #f locked shape-generator queue #f #t))
+
+
 ;; Tetrion -> Tetrion
 ;; Spawn the shape popped from the queue and push the next generated one
 (define (tetrion-spawn tn)
@@ -280,17 +291,6 @@
   )
 
 
-(define (new-tetrion #:shape-generator [shape-generator 7-loop-shape-generator]
-                     #:cols [cols 10]
-                     #:rows [rows 20]
-                     #:locked-blocks [locked-blocks '()]
-                     #:queue-size [queue-size 5])
-  (define locked (~> (empty-playfield cols rows)
-                     (playfield-add-blocks locked-blocks)))
-  (define queue (build-list queue-size (λ (_) (shape-generator))))
-  (tetrion #f locked shape-generator queue #f #t))
-
-
 ;; Return the blocks representing a Piece
 ;; by adding the piece's position to each block representing its shape.
 ;; If ghost? is true, set the block type appropriately
@@ -302,6 +302,20 @@
           (for/list ([pos (shape-name->posns sname rot)])
             (~> (block pos (cons sname (if ghost? 'ghost 'normal)))
                 (block-move (piece-posn piece))))]))
+
+
+(module+ test
+    (test-case
+      "Get piece blocks"
+    (define ft0
+      (~> (new-tetrion #:cols 10 #:rows 2)
+          (tetrion-spawn-shape 'L)))
+    (check block-lists=?
+           (~> ft0 tetrion-piece piece-blocks)
+           (strings->blocks '(".....L...."
+                              "...LLL...."
+                              ".........."
+                              "..........")))))
 
 
 ; Tetrion -> Playfield
