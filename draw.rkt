@@ -174,9 +174,11 @@
 ;; (or/c #f shape-name) -> pict
 (define (hold-piece-pict sn)
   (define bg (blank (* 5 BLOCK-W) (* 5 BLOCK-W)))
-  (cond
-    [(not sn) bg]
-    [else (cc-superimpose bg (shape-pict sn))]))
+  (define piece (cond
+                  [(not sn) bg]
+                  [else (cc-superimpose bg (shape-pict sn))]))
+  (~> piece
+      (frame #:line-width 2)))
 
 
 (module+ test
@@ -187,9 +189,20 @@
 
 
 ;; [Listof shape-name/c] -> pict
+;; We'll assume max. piece height to be 2 blocks,
+;; and max. width to be 4 blocks.
+;; We want to ensure the pict will always be of the same size,
+;; even if sometimes the pieces won't occupy it all.
 (define (queue-pict sn-ls)
+  (define border 10)
+  (define size (length sn-ls))
+  (define w (+ (* border 2) (* 4 BLOCK-W)))
+  (define h (+ (* border 2) (* (+ (* 2 size) (- size 1))
+                               BLOCK-W)))
   (~> (apply vl-append BLOCK-W (map shape-pict sn-ls))
-      (inset 10)))
+      (ct-superimpose (blank w h) _)
+      (inset border)
+      (frame #:line-width 2)))
 
 
 (module+ test
