@@ -286,7 +286,7 @@
   (define tn-locked
     (with-handlers ([exn:fail? (λ (_) (error "Game over: can't lock"))])
       (~> (tetris-tn t)
-         tetrion-lock)))
+          tetrion-lock)))
   (~> (struct-copy tetris t [tn tn-locked])
       (tetris-spawn ms)))
 

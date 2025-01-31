@@ -197,7 +197,7 @@
     (define b0 (block (make-posn 0 3) (cons 'L 'normal)))
     (check-not-exn
      (λ () (playfield-add-block plf0 b0))))
-)
+  )
 
 
 ; Like playfield-add-blocks,
@@ -238,7 +238,7 @@
     (check block-lists=?
            (playfield-blocks (playfield-add-blocks-maybe pl0 (list B1 B2 B3)))
            (list B1 B2 B3)))
-)
+  )
 
 
 ; Playfield -> Playfield

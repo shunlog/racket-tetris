@@ -2,13 +2,9 @@
 
 (require racket/list)
 (require threading)
-(require racket/draw)
-(require racket/class)
 (require racket/gui/base)
 (require lang/posn)
 (require pict)
-(require pict/color)
-(require profile)
 (require memo)
 
 (require "playfield.rkt")
@@ -54,13 +50,13 @@
   (define lt (lighter color .2))
   (define dk (darker color .08))
   (define inner-rects (pin-under
-                 (rectangle hw hw
-                            #:border-color dk
-                            #:border-width bw)
-                 1 1
-                 (rectangle hw hw
-                            #:border-color lt
-                            #:border-width bw))
+                       (rectangle hw hw
+                                  #:border-color dk
+                                  #:border-width bw)
+                       1 1
+                       (rectangle hw hw
+                                  #:border-color lt
+                                  #:border-width bw))
     )
   (define outer-rects (pin-under
                        (rectangle BLOCK-W BLOCK-W

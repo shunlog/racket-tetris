@@ -195,10 +195,10 @@
 ;; If the coordinates are not specified,
 ;; the piece will be centered at the bottom of the vanish zone.
 (define (tetrion-spawn-shape tn
-                        shape-name
-                        #:x [x #f]
-                        #:y [y #f]
-                        #:rotation [rotation 0])
+                             shape-name
+                             #:x [x #f]
+                             #:y [y #f]
+                             #:rotation [rotation 0])
   (define cols (~> tn tetrion-locked playfield-cols))
   (define rows (~> tn tetrion-locked playfield-rows))
 
@@ -351,7 +351,7 @@
 (define (tetrion-move tn posn)
   (define p (tetrion-piece tn))
   (define moved-piece (struct-copy piece p
-                 [posn (posn+ posn (piece-posn p))]))
+                                   [posn (posn+ posn (piece-posn p))]))
   (define locked (tetrion-locked tn))
   (cond
     [(playfield-can-place? locked (piece-blocks moved-piece))
@@ -423,7 +423,7 @@
                               "LLL."
                               "L..."
                               "...."))))
-)
+  )
 
 
 ;; Rotate 180, raise exn:fail if can't

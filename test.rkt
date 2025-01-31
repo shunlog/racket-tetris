@@ -33,7 +33,7 @@
                               "J.")))
 
     (hc-append 10
-     (playfield-pict plf0)
-     (arrow 30 0)
-     (playfield-pict plf-cleared))
-))
+               (playfield-pict plf0)
+               (arrow 30 0)
+               (playfield-pict plf-cleared))
+    ))

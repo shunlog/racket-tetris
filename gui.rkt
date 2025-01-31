@@ -143,26 +143,17 @@
 
 ;; Main tetris canvas:
 (define-values (tw th)
-  (~> tetris
-      tetris-tn
-      tetrion-playfield
-      playfield-pict
+  (~> tetris tetris-tn tetrion-playfield playfield-pict
       ((λ (pic) (values (pict-width pic) (pict-height pic))))))
 
 ;; Queue canvas
 (define-values (qw qh)
-  (~> tetris
-      tetris-tn
-      tetrion-queue
-      queue-pict
+  (~> tetris tetris-tn tetrion-queue queue-pict
       ((λ (pic) (values (pict-width pic) (pict-height pic))))))
 
 ;; Hold canvas
 (define-values (hold-w hold-h)
-  (~> tetris
-      tetris-tn
-      tetrion-on-hold
-      hold-piece-pict
+  (~> tetris tetris-tn tetrion-on-hold hold-piece-pict
       ((λ (pic) (values (pict-width pic) (pict-height pic))))))
 
 (define frame

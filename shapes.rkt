@@ -1,7 +1,6 @@
 #lang racket/base
 
 (require racket/contract)
-(require racket/lazy-require)
 (require rackunit)
 (require racket/generator)
 (require racket/draw)
@@ -52,12 +51,12 @@
 
 (define COLORS-HASH
   (hash 'L (make-color 255 128 0)
-       'J (make-color 0 132 255)
-       'S (make-color 0 217 51)
-       'Z (make-color 245 7 7)
-       'T (make-color 205 7 245)
-       'I (make-color 0 247 255)
-       'O (make-color 242 235 12)))
+        'J (make-color 0 132 255)
+        'S (make-color 0 217 51)
+        'Z (make-color 245 7 7)
+        'T (make-color 205 7 245)
+        'I (make-color 0 247 255)
+        'O (make-color 242 235 12)))
 
 (define (get-shape-color shape-name)
   (hash-ref COLORS-HASH shape-name))
