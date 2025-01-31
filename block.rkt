@@ -1,7 +1,12 @@
 #lang racket/base
 
-;; A Block represents a filled square in the Tetris grid,
-;; it can be locked, a garbage block, part of the Piece, or even a ghost block.
+;; A Block represents a tile (sprite ID) and its position.
+;; A tile can be:
+;; - normal colored tile
+;; - faded "ghost" tile
+;; - garbage tile
+
+;; Note: A Block that's part of the active piece is no different from locked blocks.
 
 
 (require racket/contract)

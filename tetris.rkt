@@ -1,28 +1,21 @@
 #lang racket/base
 
 
-;; This module defines a Tetris struct and functions that act on it.
-;; It provides the functions corresponding to player actions,
-;; as well as accessors necessary for the drawing and presentation, such tetris-tn (tetrion).
+;; Tetris is the final data structure with methods that correspond directly to input events.
+;; Think of Tetris as a controller for a Tetrion.
+;; It takes input events and their timestamps,
+;; and decides what functions to call on the Tetrion.
+;; For that, it also keeps track of timestamps of past events (one for each event type),
+;; and various state variables (e.g. last-moved)
 
-;; Tetris is based on the Tetrion module, which it instantiates in its struct.
-;; While Tetrion is like a state machine that you control step by step,
-;; the Tetris structure introduces the time axis.
-;; It mostly wraps the Tetrion methods, while taking the timestamp of the action into account.
+;; Besides key events such as "press left" and "release left",
+;; there is also a "tick" event, which is supposed to be called at least 30 times/second.
 
-;; Most of the functions that act on it take the current time as an argument.
-;; Besides the functions representing player actions, such as "move left" or "rotate clockwise",
-;; there is the "tick" function, which is supposedly called at least 30 times/second.
-;; The tick function is supposed to be called inside the game loop,
-;; while the action functions are supposed to be called on each key event.
-
-;; However, these functions are not only called live during a game.
-;; This Tetris is deterministic, so it's possible to save and replay games.
+;; Since this Tetris is deterministic, it's possible to save and replay games.
 ;; To save a game, you need to save two things:
 ;;   1. the initial seed for the RNG
-;;   2. for every event/tick, save the function name and the timestamp with which it was called
-;; Then you call these functions again but using the saved timestamps instead of the current ones,
-;; and you will get a perfect replay of that game.
+;;   2. the sequence of input events and ticks, together with their timestamps
+;; To replay, simply reproduce the sequence of function calls.
 
 ;; Note that some functions can raise an error, which signifies a game over:
 ;;   - tetris-on-tick
@@ -32,7 +25,6 @@
 ;; Note: the "*-pressed" and the "*-released" functions assume that
 ;; each press is followed by a release, which is not the case with the key autofire events,
 ;; so they have to be filtered.
-
 
 
 ;; -------------------------------
@@ -58,7 +50,7 @@
   [tetris-tn (-> tetris? tetrion?)]
   [tetris-fps (-> tetris? number?)]
 
-  ;; Player actions
+  ;; Event handlers
   [tetris-left-pressed (-> tetris? natural-number/c tetris?)]
   [tetris-left-released (-> tetris? natural-number/c tetris?)]
   [tetris-right-pressed (-> tetris? natural-number/c tetris?)]
@@ -70,8 +62,6 @@
   [tetris-rotate-180 (-> tetris? natural-number/c tetris?)]
   [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
   [tetris-hold (-> tetris? natural-number/c tetris?)]
-
-  ;; Big bang on-tick
   [tetris-on-tick (-> tetris? natural-number/c tetris?)]
   ))
 
@@ -95,9 +85,12 @@
 ;;   - tn: Tetrion
 ;;   - pressed-hash: hash mapping a key to a (cons Boolean Natural],
 ;;                   whether it is pressed or not, and the timestamp when it was last pressed/released
-;;   - t-drop: timer for gravity drop, is set to the timestamp of the last drop or spawn
-;;   - t-autoshift: timer for autoshift move, set when autoshft last moved the piece
-;;   - t-lock: timer for locking, set to the time of the last successful move, rotation or drop
+;;   - t-drop: timer for gravity drop,
+;;             set to the timestamp of the last drop or spawn
+;;   - t-autoshift: timer for autoshift move,
+;;                  set to the timestamp of the last successful autoshift
+;;   - t-lock: timer for locking the active piece,
+;;             set to the time of the last successful move, rotation or drop
 ;;   - ticks: queue of the timestamps of the last few ticks (to compute the FPS)
 (struct tetris [tn
                 pressed-hash

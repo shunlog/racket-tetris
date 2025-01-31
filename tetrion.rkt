@@ -1,43 +1,29 @@
 #lang racket/base
 
-;; This module implements a "frozen" Tetris, or a "Tetris machine".
-;; Think of it as a Tetris that's been frozen in time:
-;; all the inputs that have an immediate effect still work,
-;; whereas everything that happens with a delay doesn't.
-;;
-;; You can all the basic actions:
-;;   - pressing Left/Right moves the piece
-;;   - pressing Space drops it
-;;   - you can move the piece down with a function call
-;;   - you can lock the piece with a function call
-;;   - piece spawn, score update, game over check
-;;
-;; Except for actions that need information about time:
-;;   - autoshift
-;;   - gravity
-;;   - lock delay
+;; A Tetrion is a "Tetris machine".
+;; Think of it as mechanical Tetris that you control manually through commands:
+;; move the piece left, drop the piece, lock the piece, spawn a new one.
 
+;; For an actual Tetris, you are supposed to write a module that controls the Tetrion.
+;; The benefit of having the Tetrion separate is modularity:
+;; It is easier to ensure that every command issued on a Tetrion won't result in an invalid state
+;; when you don't have to worry about timestamps and ticks.
 
-;; One quirk is that actions are handled a bit more atomically.
-;; For example, while you might expect that locking a piece would clear the lines,
-;; for the Tetrion these are separate actions.
-;; All of these are separate:
-;;   - locking the piece
-;;   - spawning a piece
-;;   - clearing lines (together with updating the score)
+;; Note:
+;; Locking the piece and spawning a new one are two separate functions.
+;; This enables us to test them separately.
 
 ;; All of the movement functions raise an exception if the piece can't be moved.
 ;; For example `tetrion-drop` will raise an exception when the piece is already on the floor.
 ;; The lock and spawn functions raise exceptions when it's game-over.
-;;
-;; This is useful for the Tetris "driver" that wraps the Tetrion
-;; which will handle the rest of the logic.
-;; This way, the Tetris driver can immediately know that it's time to lock the piece.
-;; This is a better solution than the two alternatives:
-;;   1. return #f on failure
-;;   2. return an unmodified Tetrion
+
+;; Note:
+;; I think raising exceptions on failure is better than either:
+;;   1. returning #f, or
+;;   2. returning an unmodified Tetrion
 ;; In the 1st case, we could forget to check for the false value, and it would propagate further
 ;; In the 2nd case, we would have to double check if the piece has moved, which is redundant
+;; TODO: use a custom exception type to distinguish from actual errors.
 
 
 (require racket/contract)
@@ -93,9 +79,10 @@
 ; - piece: Piece
 ; - locked: Playfield of the locked blocks
 ; - shape-generator: shape-generator? - a function with no arguments that returns a shape-name
-; - queue: [list-of shape-name/c], represents the next piece preview, must have at least 1 element
-; - on-hold: (or/c #f shape-name/c), represents the hold piece, or lack thereof
-; - can-hold: boolean, false if the current piece was obtained from the hold
+; - queue: [list-of shape-name/c] - the list of next pieces, for preview. Must have at least 1 element.
+; - on-hold: (or/c #f shape-name/c) - the shape on hold, or #f if none
+; - can-hold: boolean - whether it is legal to put the current piece on hold.
+;        by default, if the current piece was obtained from the hold, you can't put it back on hold.
 (struct tetrion [piece locked shape-generator queue on-hold can-hold])
 
 
@@ -103,8 +90,10 @@
 ; - posn: Posn
 ; - shape-name: shape-name/c
 
-;; Think of the Piece as a "blueprint" instead of actual blocks,
-;; visualize it as a lump of faded blocks that you can move around.
+;; The Tetrion struct keeps the active piece blocks and the locked blocks separate.
+
+;; Think of the Piece as a pair of (position, blueprint) instead of a list of blocks,
+;; the blueprint being identified by a shape-name, provided by shapes.rkt.
 ;; When we draw the Tetrion, we convert the Piece to its constituent blocks,
 ;; but internally, it is just a blueprint that we can move around and even set to #f.
 ;;

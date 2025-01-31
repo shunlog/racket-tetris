@@ -1,10 +1,16 @@
 #lang racket/base
 
-;; This module implements a Tetris Playfield,
-;; which is the grid that you can add blocks to.
-;;   To a Playfield, all the blocks are equivalent,
-;; so it can't tell apart settled blocks
-;; from blocks that make up the active piece
+;; A Playfield keeps track of the grid size and the Blocks in it.
+;; The Playfield doesn't distinguish between blocks (whether active, locked or ghost).
+
+
+; A Playfield is a struct:
+; - cols: natural
+; - rows: natural
+; - m: matrix, a list of `rows` lists, each having `cols` items;
+;      a list item is either #f or a BlockType
+(struct playfield [cols rows m])
+
 
 (require racket/contract)
 (provide
@@ -48,13 +54,6 @@
 ;; ----------------------------
 ;; Definitions
 
-
-; A Playfield is a struct:
-; - cols: natural
-; - rows: natural
-; - m: matrix, a list of `rows` lists, each having `cols` items;
-;      a list item is either #f or a BlockType
-(struct playfield [cols rows m])
 
 ;; Example 1
 (define bt1 'garbage)
