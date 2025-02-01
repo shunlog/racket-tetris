@@ -6,6 +6,8 @@
 (require lang/posn)
 (require pict)
 (require memo)
+(require racket/contract)
+(require racket/class)
 
 (require "playfield.rkt")
 (require "block.rkt")
@@ -18,6 +20,21 @@
 (define GARBAGE-COLOR (make-color 156 154 154))
 (define GHOST-ALPHA 0.3)
 (define VANISH-LINES 2)    ; number of rows to draw in the vanish zone
+
+
+(define COLORS-HASH
+  (hash 'L (make-color 255 128 0)
+        'J (make-color 0 132 255)
+        'S (make-color 0 217 51)
+        'Z (make-color 245 7 7)
+        'T (make-color 205 7 245)
+        'I (make-color 0 247 255)
+        'O (make-color 242 235 12)))
+
+(define/contract (get-shape-color shape-name)
+  (-> shape-name/c (is-a?/c color%))
+  (hash-ref COLORS-HASH shape-name))
+
 
 (provide
  BLOCK-W
@@ -33,18 +50,21 @@
   (displayln "Running tests."))
 
 
-;; BlockType -> Color
-(define (block-color bt)
+
+;; Tile -> Color
+(define/contract (block-color tile)
+  (-> tile? (is-a?/c color%))
   (cond
-    [(equal? 'garbage bt) GARBAGE-COLOR]
+    [(tile-garbage? tile) GARBAGE-COLOR]
     [else
-     (define shape-color (get-shape-color (car bt)))
-     (cond [(equal? 'normal (cdr bt)) shape-color]
-           [(equal? 'ghost (cdr bt)) (set-alpha shape-color GHOST-ALPHA)])]))
+     (define shape-color (get-shape-color (tile-shape tile)))
+     (cond [(tile-normal? tile) shape-color]
+           [(tile-ghost? tile) (set-alpha shape-color GHOST-ALPHA)]
+           [else (raise "Error")])]))
 
 
-(define (block-type-pict bt)
-  (define color (block-color bt))
+(define (tile-pict tile)
+  (define color (block-color tile))
   (define hw (/ BLOCK-W 2))             ; half width of square
   (define bw 2)                         ; border width inside square
   (define lt (lighter color .2))
@@ -67,13 +87,13 @@
                                   #:border-color lt
                                   #:border-width bw)))
   (cond
-    [(equal? bt 'garbage)
+    [(tile-garbage? tile)
      (filled-rectangle BLOCK-W BLOCK-W
                        #:color color
                        #:border-color dk
                        #:border-width bw)]
 
-    [(equal? (cdr bt) 'normal) (cc-superimpose
+    [(tile-normal? tile) (cc-superimpose
                                 (filled-rectangle BLOCK-W BLOCK-W
                                                   #:color color
                                                   #:draw-border? #f)
@@ -85,24 +105,24 @@
   )
 
 ;; Use hash so it uses (equal?) to compare values,
-;; Otherwise comparing BlockTypes (which are cons) would return false
-(define/memoize (block-type-bitmap bt ) #:hash hash
-  (bitmap (block-type-pict bt)))
+;; Otherwise comparing Tiles (which are cons) would return false
+(define/memoize (tile-bitmap tile ) #:hash hash
+  (bitmap (tile-pict tile)))
 
 (define (playfield-pict plf)
   (define rows (playfield-rows plf))
   (define cols (playfield-cols plf))
   (define bl (playfield-block-matrix plf))
-  (define bt-ls (de-nest (reverse (take bl (+ VANISH-LINES rows)))))
+  (define tile-ls (de-nest (reverse (take bl (+ VANISH-LINES rows)))))
   (ct-superimpose
    (filled-rectangle (* BLOCK-W cols) (* BLOCK-W (+ VANISH-LINES rows))
                      #:color "black")
    (rectangle (* cols BLOCK-W) (* VANISH-LINES BLOCK-W)
               #:border-color "gray"
               #:border-width 3)
-   (table cols (map (λ (bt)
-                      (if (not bt) (blank BLOCK-W BLOCK-W) (block-type-bitmap bt)))
-                    bt-ls)
+   (table cols (map (λ (tile)
+                      (if (not tile) (blank BLOCK-W BLOCK-W) (tile-bitmap tile)))
+                    tile-ls)
           cc-superimpose cc-superimpose 0 0)))
 
 (module+ test
@@ -161,7 +181,7 @@
     (define col (posn-x pos))
     (define dy (* BLOCK-W (- max-row row)))
     (define dx (* BLOCK-W (- col min-col)))
-    (pin-over img dx dy (block-type-bitmap (cons sn 'normal))))
+    (pin-over img dx dy (tile-bitmap (tile-normal sn))))
   )
 
 (module+ test

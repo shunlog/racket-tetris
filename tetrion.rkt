@@ -284,7 +284,7 @@
   (test-case
       "Block out: the spawned piece overlaps with locked blocks."
     (define tn-full
-      (new-tetrion #:locked-blocks (list (block (make-posn 5 21) (cons 'I 'normal)))))
+      (new-tetrion #:locked-blocks (list (block (make-posn 5 21) (tile-normal 'I)))))
     (check-exn
      #rx"block out"
      (λ () (tetrion-spawn-shape tn-full 'L))))
@@ -300,7 +300,7 @@
     [else (define sname (piece-shape-name piece))
           (define rot (piece-rotation piece))
           (for/list ([pos (shape-name->posns sname rot)])
-            (~> (block pos (cons sname (if ghost? 'ghost 'normal)))
+            (~> (block pos (if ghost? (tile-ghost sname) (tile-normal sname)))
                 (block-move (piece-posn piece))))]))
 
 
@@ -343,9 +343,9 @@
                        "...")))
   (define piece+ghost-blocks1
     (append piece-blocks1
-            (list (block (make-posn 0 0) '(T . ghost))
-                  (block (make-posn 1 0) '(T . ghost))
-                  (block (make-posn 2 0) '(T . ghost)))))
+            (list (block (make-posn 0 0) (tile-ghost 'T))
+                  (block (make-posn 1 0) (tile-ghost 'T))
+                  (block (make-posn 2 0) (tile-ghost 'T)))))
 
   (test-case
       "Get Tetrion playfield without ghost piece blocks"

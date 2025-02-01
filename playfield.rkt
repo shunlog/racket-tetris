@@ -4,14 +4,6 @@
 ;; The Playfield doesn't distinguish between blocks (whether active, locked or ghost).
 
 
-; A Playfield is a struct:
-; - cols: natural
-; - rows: natural
-; - m: matrix, a list of `rows` lists, each having `cols` items;
-;      a list item is either #f or a BlockType
-(struct playfield [cols rows m])
-
-
 (require racket/contract)
 (provide
  (contract-out
@@ -33,7 +25,7 @@
   
   ;; Get a list of Blocks in the Playfield
   [playfield-blocks (-> playfield? (listof block?))]
-  [playfield-block-matrix (-> playfield? (listof (listof (or/c block-type/c #f))))]
+  [playfield-block-matrix (-> playfield? (listof (listof (or/c tile? #f))))]
   
   ;; Clear completed lines in the Playfield
   [playfield-clear-lines (-> playfield? playfield?)]
@@ -55,12 +47,19 @@
 ;; Definitions
 
 
+; A Playfield is a struct:
+; - cols: natural
+; - rows: natural
+; - m: matrix, a list of `rows` lists, each having `cols` items;
+;      a list item is either #f or a Tile
+(struct playfield [cols rows m])
+
 ;; Example 1
-(define bt1 'garbage)
-(define bt2 (cons 'L 'normal))
-(define PLF1-blocks (list (block (make-posn 0 0) bt1)
-                          (block (make-posn 1 1) bt2)))
-(define PLF1 (playfield 2 2 `((,bt1 #f) (#f ,bt2))))
+(define B1 (block (make-posn 0 0) TILE-GARBAGE))
+(define B2 (block (make-posn 1 1) TILE-GHOST))
+
+(define PLF1-blocks (list B1 B2))
+(define PLF1 (playfield 2 2 `((,TILE-GARBAGE #f) (#f ,TILE-GHOST))))
 
 
 ; -------------------------------
@@ -80,25 +79,6 @@
                          (λ (_) (build-list cols
                                             (λ (_) #f))))))
 
-
-; Playfield -> List[Block]
-(define (playfield-blocks plf)
-  (define (row-blocks row y)
-    (for/list ([val row]
-               [x (in-naturals)]
-               #:when (block-type/c val))
-      (block (make-posn x y) val)))
-  (for/fold ([acc-ls '()])
-            ([row (playfield-m plf)]
-             [y (in-naturals)])
-    (append acc-ls (row-blocks row y))))
-
-; Playfield -> List[List[ (or BlockType #f)]]
-; Note: also returns the vanish zone lines
-(define (playfield-block-matrix plf)
-  (playfield-m plf))
-
-
 (module+ test
   (test-case
       "Create an empty Playfield"
@@ -106,7 +86,28 @@
     (check-equal? (playfield-blocks plf0) '())
     (check-equal? (playfield-cols plf0) 8)
     (check-equal? (playfield-rows plf0) 15))
+  )
 
+
+; Playfield -> List[Block]
+(define (playfield-blocks plf)
+  (define (row-blocks row y)
+    (for/list ([val row]
+               [x (in-naturals)]
+               #:when (tile? val))
+      (block (make-posn x y) val)))
+  (for/fold ([acc-ls '()])
+            ([row (playfield-m plf)]
+             [y (in-naturals)])
+    (append acc-ls (row-blocks row y))))
+
+; Playfield -> List[List[ (or Tile #f)]]
+; Note: also returns the vanish zone lines
+(define (playfield-block-matrix plf)
+  (playfield-m plf))
+
+
+(module+ test
   (test-case
       "Get playfield blocks"
     (check-equal?
@@ -145,7 +146,7 @@
                                (posn-y (block-posn block))))
   (define m (playfield-m plf))
   (define row (list-ref m y))
-  (define new-row (list-set row x (block-type block)))
+  (define new-row (list-set row x (block-tile block)))
   (define new-m (list-set m y new-row))
   (struct-copy playfield plf [m new-m]))
 
@@ -158,8 +159,7 @@
 
 
 (module+ test
-  (define B1 (block (make-posn 1 1) (cons 'L 'normal)))
-  (define B2 (block (make-posn 1 2) (cons 'J 'normal)))
+
   (test-case
       "Add a block to the Playfield"
     (define pl0 (~> (empty-playfield 10 20)
@@ -180,21 +180,23 @@
     (define pl3 (~> (empty-playfield 10 20)
                     (playfield-add-block B1)))
     (check-exn
-     #rx"pos.*1.*1"
+     #rx"pos.*0.*0"
      (λ () (playfield-add-block pl3 B1))))
 
   (test-case
       "Error on adding block outside playfield"
     (define plf0 (empty-playfield 1 2))
-    (define b0 (block (make-posn 1 0) (cons 'J 'normal)))
+    ;; Make a block on column 2
+    (define b0 (block (make-posn 1 0) TILE-GARBAGE))
+    ;; Error should raise because there's only 1 column
     (check-exn
      #rx"pos.*1.*0"
      (λ () (playfield-add-block plf0 b0))))
 
   (test-case
-      "Add block in the vanish zone (which is the same size as the active zone)"
+      "Add block above the playfield's limits"
     (define plf0 (empty-playfield 1 2))
-    (define b0 (block (make-posn 0 3) (cons 'L 'normal)))
+    (define b0 (block (make-posn 0 3) TILE-GARBAGE))
     (check-not-exn
      (λ () (playfield-add-block plf0 b0))))
   )
@@ -217,7 +219,7 @@
   (define garbage-lines
     (build-list n (λ (_)
                     (append
-                     (build-list (sub1 cols) (λ (_) 'garbage))
+                     (build-list (sub1 cols) (λ (_) TILE-GARBAGE))
                      '(#f)))))
   (define m (playfield-m plf))
   (define new-matrix
@@ -230,9 +232,9 @@
 (module+ test
   (test-case
       "Add some blocks to the Playfield"
-    (define B1 (block (make-posn 1 1) (cons 'L 'normal)))
-    (define B2 (block (make-posn 1 2) (cons 'J 'normal)))
-    (define B3 (block (make-posn 1 3) (cons 'J 'normal)))
+    (define B1 (block (make-posn 1 1) (tile-normal 'L)))
+    (define B2 (block (make-posn 1 2) (tile-normal 'J)))
+    (define B3 (block (make-posn 1 3) (tile-normal 'J)))
     (define pl0 (~> (empty-playfield 10 20)
                     (playfield-add-block B2)))
     (check block-lists=?
