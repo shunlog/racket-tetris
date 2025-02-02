@@ -116,6 +116,7 @@
 (define (on-tick)
   (yield)
   (set! tetris (tetris-on-tick tetris (millis)))
+  (send lines-cleared-msg set-label (number->string (tetrion-cleared (tetris-tn tetris))))
   (update-canvases))
 
 
@@ -232,6 +233,12 @@
        [label "Game over! Press F4 to restart."]
        [parent main-vert-pane]))
 (send game-over-msg show #f)
+
+
+(define lines-cleared-msg
+  (new message%
+       [label "0"]
+       [parent main-vert-pane]))
 
 
 

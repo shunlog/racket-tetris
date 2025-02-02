@@ -28,7 +28,7 @@
   [playfield-block-matrix (-> playfield? (listof (listof (or/c tile? #f))))]
   
   ;; Clear completed lines in the Playfield
-  [playfield-clear-lines (-> playfield? playfield?)]
+  [playfield-clear-lines (-> playfield? (values playfield? natural-number/c))]
   ))
 
 
@@ -243,7 +243,9 @@
   )
 
 
-; Playfield -> Playfield
+; Playfield -> Playfield, Natural
+; Clears full lines from the playfield,
+; Returns the playfield alongside the number of cleared lines
 (define (playfield-clear-lines plf)
   (define cols (playfield-cols plf))
   (define m (playfield-m plf))
@@ -252,12 +254,14 @@
   (define filtered-m
     ;; filter the full rows
     (for/list ([row m] #:unless (full-row? row)) row))
+  (define num-cleared (- (length m) (length filtered-m)))
   (define new-m
     ;; add back empty rows above
     (append filtered-m
-            (build-list (- (length m) (length filtered-m))
+            (build-list num-cleared
                         (λ (_) (build-list cols (λ (_) #f))))))
-  (struct-copy playfield plf [m new-m]))
+  (values (struct-copy playfield plf [m new-m])
+          num-cleared))
 
 (module+ test
   (test-case
@@ -270,11 +274,12 @@
                               "II"
                               "J."
                               "LL")))))
-    (define plf-cleared (playfield-clear-lines plf0))
+    (define-values (plf-cleared num-cleared) (playfield-clear-lines plf0))
     (check block-lists=?
            (playfield-blocks plf-cleared)
            (strings->blocks '(".S"
                               ".."
                               "J.")))
     (check-equal? (length (playfield-m  plf-cleared))
-                  (length (playfield-m plf0)))))
+                  (length (playfield-m plf0)))
+    (check-equal? 2 num-cleared)))

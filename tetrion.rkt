@@ -42,6 +42,7 @@
   [tetrion-playfield (->* (tetrion?) (boolean?) playfield?)]
   [tetrion-queue (-> tetrion? (listof shape-name/c))]
   [tetrion-on-hold (-> tetrion? (or/c #f shape-name/c))]
+  [tetrion-cleared (-> tetrion? natural-number/c)]
 
   ;; Movement
   [tetrion-drop (-> tetrion? tetrion?)]
@@ -84,7 +85,8 @@
 ; - on-hold: (or/c #f shape-name/c) - the shape on hold, or #f if none
 ; - can-hold: boolean - whether it is legal to put the current piece on hold.
 ;        by default, if the current piece was obtained from the hold, you can't put it back on hold.
-(struct tetrion [piece locked shape-generator queue on-hold can-hold])
+; - cleared: (natural) - number of lines cleared so far
+(struct tetrion [piece locked shape-generator queue on-hold can-hold cleared])
 
 
 ; A Piece is either #f or a struct:
@@ -129,7 +131,7 @@
   (define locked (~> (empty-playfield cols rows)
                      (playfield-add-blocks locked-blocks)))
   (define queue (build-list queue-size (λ (_) (shape-generator))))
-  (tetrion #f locked shape-generator queue #f #t))
+  (tetrion #f locked shape-generator queue #f #t 0))
 
 
 ;; Tetrion -> Tetrion
@@ -630,12 +632,15 @@
      (error "All piece blocks above ceiling: lock out")]
     [else
      (define piece-blcks (~> tn tetrion-piece piece-blocks))
-     (define new-locked
+     (define-values (new-locked num-cleared)
        (~> (tetrion-locked tn)
            (playfield-add-blocks  piece-blcks)
            (playfield-clear-lines)))
+     (define new-cleared
+       (+ num-cleared (tetrion-cleared tn)))
      (struct-copy tetrion tn
                   [locked new-locked]
+                  [cleared new-cleared]
                   [piece #f])]))
 
 

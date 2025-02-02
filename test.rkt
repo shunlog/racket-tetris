@@ -25,7 +25,7 @@
                               "II"
                               "J."
                               "LL")))))
-    (define plf-cleared (playfield-clear-lines plf0))
+    (define-values (plf-cleared num-cleared) (playfield-clear-lines plf0))
     (check block-lists=?
            (playfield-blocks plf-cleared)
            (strings->blocks '(".S"
