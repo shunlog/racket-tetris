@@ -181,7 +181,10 @@
       ((λ (pic) (values (pict-width pic) (pict-height pic))))))
 
 (define frame
-  (new tetris-frame%
+  (new (class tetris-frame%
+         (super-new)
+         (define/augment (on-close)
+           (exit)))
        [label FRAME-LABEL]
        [width (+ tw qw hold-w)]
        [height (max th qh hold-h)]))
