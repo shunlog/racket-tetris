@@ -1,8 +1,9 @@
 #lang racket/base
 
-
 ;; This module creates a GUI frame for playing Tetris.
 
+;; Time is measured using (millis),
+;; which returns the monotonic, inexact, rounded number of ms.
 
 ;; -------------------------------
 ;; Constants
@@ -14,6 +15,8 @@
 (define COLS 10)
 (define GARBAGE-ROWS 10)
 (define QUEUE-SIZE 5)
+
+(define TIMER-INTERVAL (inexact->exact (round (/ 1000 FPS))))
 
 ; -------------------------------
 ; Requires
@@ -47,12 +50,31 @@
                             (tetrion-add-garbage GARBAGE-ROWS))))
 
 
+
+;; Converts number to string, and pads it with 0's
+(define (num-pad-left n width)
+  (define num-str (number->string n))
+  (define padding (max 0 (- width (string-length num-str))))
+  (string-append (make-string padding #\0) num-str))
+
+
+;; Convert milliseconds to timer string, like "00:01:684"
+(define (millis->string total-ms)
+  (define ms (remainder total-ms 1000))
+  (define s (remainder (quotient total-ms 1000) 60))
+  (define m (quotient total-ms (* 1000 60)))
+  (format "~a:~a:~a" (num-pad-left m 2) (num-pad-left s 2) (num-pad-left ms 3)))
+
+
 ;; -------------------------------
 ;; State variables
 
 
 ;; The Tetris state will be mutated for simplicity
 (define tetris (make-new-tetris))
+
+;; The (millis) when the game started
+(define ms-start 0)
 
 
 ; -------------------------------
@@ -117,6 +139,7 @@
   (yield)
   (set! tetris (tetris-on-tick tetris (millis)))
   (send lines-cleared-msg set-label (number->string (tetrion-cleared (tetris-tn tetris))))
+  (send timer-msg set-label (millis->string (- (millis) ms-start)))
   (update-canvases))
 
 
@@ -241,12 +264,16 @@
        [parent main-vert-pane]))
 
 
+(define timer-msg
+  (new message%
+       [label "0"]
+       [parent main-vert-pane]))
 
-(define TIMER-INTERVAL (inexact->exact (round (/ 1000 FPS))))
+
+;; Make sure the timer doesn't start automatically
 (define timer
   (new timer%
-       [notify-callback on-tick]
-       [interval TIMER-INTERVAL]))
+       [notify-callback on-tick]))
 
 
 (define (game-over)
@@ -258,7 +285,11 @@
 (define (restart-game)
   (set! tetris (make-new-tetris))
   (send timer start TIMER-INTERVAL)
+  (set! ms-start (millis))
   (send game-over-msg show #f))
 
 
 (send frame show #t)
+
+;; Start the game at this point
+(restart-game)
