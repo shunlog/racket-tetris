@@ -223,7 +223,7 @@
 ; ShapeName Rotation Rotation -> (Listof (list integer integer))
 ; Returns the list of kicks to try for given shape when rotating fails
 (define (kick-data sn rot-initial rot-final)
-  (define ls (hash-ref (hash-ref h-kick-data sn)
+  (define ls (hash-ref (hash-ref h-kick-data sn h-kick-data-1)
                        (cons rot-initial rot-final)
                        #f))
   (if (not ls)

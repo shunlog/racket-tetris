@@ -5,11 +5,13 @@
 (provide
  GARBAGE-COLOR
  COLORS-HASH
+ DEFAULT-COLOR
  color%)
 
 (define (make-color r g b) (make-object color% r g b))
 
 (define GARBAGE-COLOR (make-color 156 154 154))
+(define DEFAULT-COLOR (make-color 255 200 255))
 
 (define COLORS-HASH
   (hash 'L (make-color 255 128 0)
