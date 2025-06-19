@@ -9,7 +9,7 @@
 ;; Constants
 
 
-(define FPS 60)
+(define FPS 120)
 (define FRAME-LABEL "World")
 (define ROWS 20)
 (define COLS 10)
@@ -136,7 +136,7 @@
 ;; void -> void
 ;; Update the tetris on a clock tick (called by timer)
 (define (on-tick)
-  (yield)
+  ;; (yield)
   (set! tetris (tetris-on-tick tetris (millis)))
   (send lines-cleared-msg set-label (number->string (tetrion-cleared (tetris-tn tetris))))
   (send timer-msg set-label (millis->string (- (millis) ms-start)))
