@@ -25,7 +25,7 @@
 
 
 (define SHAPE-NAMES
-  '(L J S Z O I T))
+  '(L J S Z O I T P))
 
 ; Rotation is one of '(0 1 2 3),
 ; meaning 0°, 90°, 180° and 270° of clockwise rotation respectively
@@ -66,6 +66,9 @@
                          (T . ((#f #t #f)
                                (#t #t #t)
                                (#f #f #f)))
+                         (P . ((#f #t #t)
+                               (#t #t #t)
+                               (#f #t #f)))
                          (O . ((#t #t)
                                (#t #t)))
                          (I . ((#f #f #f #f)
@@ -131,7 +134,7 @@
 
 
 (define 7-tetrominoes-set
-  '(L J S Z O I T))
+  '(L J S Z O I T P))
 
 ;; This generator implements the standard Random Generator which permutes bags of 7 tetrominoes:
 ;; https://tetris.wiki/Random_Generator
