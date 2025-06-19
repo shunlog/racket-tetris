@@ -23,10 +23,9 @@
 (define GHOST-ALPHA 0.3)
 (define VANISH-LINES 2)    ; number of rows to draw in the vanish zone
 
-
 (define/contract (get-shape-color shape-name)
   (-> shape-name/c (is-a?/c color%))
-  (hash-ref COLORS-HASH shape-name))
+  (hash-ref COLORS-HASH shape-name DEFAULT-COLOR))
 
 
 (provide

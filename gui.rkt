@@ -13,7 +13,7 @@
 (define FRAME-LABEL "World")
 (define ROWS 20)
 (define COLS 10)
-(define GARBAGE-ROWS 10)
+(define GARBAGE-ROWS 0)
 (define QUEUE-SIZE 5)
 
 (define TIMER-INTERVAL (inexact->exact (round (/ 1000 FPS))))
