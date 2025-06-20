@@ -113,7 +113,7 @@
 ;; Update the tetris on key press/release
 (define (on-tetris-event key-ev)
   (define new-tetris
-    (with-handlers ([exn:fail? (λ (_) (game-over))])
+    (with-handlers ([exn:fail:tetris:gameover? (λ (_) (game-over))])
       (case (send key-ev get-key-code)
         [(left) (tetris-left-pressed tetris (millis))]
         [(right) (tetris-right-pressed tetris (millis))]

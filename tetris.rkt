@@ -42,6 +42,7 @@
 
 (require racket/contract)
 (provide
+ exn:fail:tetris:gameover?
  (contract-out
   [tetris? (-> any/c boolean?)]
   [new-tetris (->* (natural-number/c)
@@ -79,6 +80,15 @@
 
 ;; ----------------------------
 ;; Definitions
+
+
+(struct	exn:fail:tetris:gameover exn:fail:tetris ()
+  #:extra-constructor-name make-exn:fail:tetris:gameover
+  #:transparent)
+
+(define (raise-tetris-gameover msg)
+  (raise (make-exn:fail:tetris:gameover msg (current-continuation-marks))))
+
 
 
 ;; A Tetris is a struct:
@@ -271,10 +281,11 @@
   )
 
 
+
 ;; Spawn the next piece, while also resetting the lock and drop timers
 (define (tetris-spawn t ms)
   (define new-tn
-    (with-handlers ([exn:fail? (λ (_) (error "Game over: can't spawn"))])
+    (with-handlers ([exn:fail? (λ (_) (raise-tetris-gameover "Can't spawn"))])
       (tetrion-spawn (tetris-tn t))))
   (struct-copy tetris t
                [tn new-tn]
@@ -284,7 +295,7 @@
 
 (define (tetris-lock t ms)
   (define tn-locked
-    (with-handlers ([exn:fail? (λ (_) (error "Game over: can't lock"))])
+    (with-handlers ([exn:fail? (λ (_) (raise-tetris-gameover "Can't lock"))])
       (~> (tetris-tn t)
           tetrion-lock)))
   (~> (struct-copy tetris t [tn tn-locked])
