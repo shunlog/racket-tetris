@@ -8,6 +8,7 @@
 (require memo)
 (require racket/contract)
 (require racket/class)
+(require racket/draw)
 
 (require "playfield.rkt")
 (require "block.rkt")
@@ -15,17 +16,6 @@
 (require "draw-utils.rkt")
 (require "tetrion.rkt")
 (require "utils.rkt")
-(require "colors.rkt")
-
-
-(define BLOCK-W 32)
-
-(define GHOST-ALPHA 0.3)
-(define VANISH-LINES 2)    ; number of rows to draw in the vanish zone
-
-(define/contract (get-shape-color shape-name)
-  (-> shape-name/c (is-a?/c color%))
-  (hash-ref COLORS-HASH shape-name DEFAULT-COLOR))
 
 
 (provide
@@ -35,6 +25,31 @@
  queue-pict
  hold-piece-pict
  )
+
+(define (make-color r g b) (make-object color% r g b))
+
+(define GARBAGE-COLOR (make-color 156 154 154))
+(define DEFAULT-COLOR (make-color 255 200 255))
+
+(define COLORS-HASH
+  (hash 'L (make-color 255 128 0)
+        'J (make-color 0 132 255)
+        'S (make-color 0 217 51)
+        'Z (make-color 245 7 7)
+        'T (make-color 205 7 245)
+        'I (make-color 0 247 255)
+        'O (make-color 242 235 12)))
+
+(define BLOCK-W 32)
+
+(define GHOST-ALPHA 0.3)
+(define VANISH-LINES 2)    ; number of rows to draw in the vanish zone
+
+
+(define/contract (get-shape-color shape-name)
+  (-> shape-name/c (is-a?/c color%))
+  (hash-ref COLORS-HASH shape-name DEFAULT-COLOR))
+
 
 
 ; Init the test module
