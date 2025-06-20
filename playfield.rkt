@@ -141,7 +141,7 @@
 ; Playfield Block -> Playfield
 (define (playfield-add-block plf block)
   (unless (playfield-can-place? plf block)
-    (error "Can't place block: " block))
+    (raise-tetris (format "Can't place block: ~v" block)))
   (define-values (x y) (values (posn-x (block-posn block))
                                (posn-y (block-posn block))))
   (define m (playfield-m plf))
@@ -176,11 +176,11 @@
            (list B1 B2)))
 
   (test-case
-      "Expect error when there is a block at given position already"
+      "Expect exception signal when there is a block at given position already"
     (define pl3 (~> (empty-playfield 10 20)
                     (playfield-add-block B1)))
     (check-exn
-     #rx"pos.*0.*0"
+     exn:fail:tetris?
      (λ () (playfield-add-block pl3 B1))))
 
   (test-case
@@ -190,7 +190,7 @@
     (define b0 (block (make-posn 1 0) TILE-GARBAGE))
     ;; Error should raise because there's only 1 column
     (check-exn
-     #rx"pos.*1.*0"
+     exn:fail:tetris?
      (λ () (playfield-add-block plf0 b0))))
 
   (test-case
