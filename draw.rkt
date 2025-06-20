@@ -24,6 +24,7 @@
  playfield-pict
  queue-pict
  hold-piece-pict
+ tetrion-pict
  )
 
 (define (make-color r g b) (make-object color% r g b))
@@ -132,6 +133,12 @@
                       (if (not tile) (blank BLOCK-W BLOCK-W) (tile-bitmap tile)))
                     tile-ls)
           cc-superimpose cc-superimpose 0 0)))
+
+;; Tetrion -> Pict
+(define (tetrion-pict tn)
+  (ht-append (playfield-pict (tetrion-playfield tn))
+             (queue-pict (tetrion-queue tn))
+             (hold-piece-pict (tetrion-on-hold tn))))
 
 (module+ test
   (test-case
