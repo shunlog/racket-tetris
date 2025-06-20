@@ -148,7 +148,7 @@
   (define blck-posn (block-posn blck))
   (define new-posn (posn+ blck-posn posn))
   (if (not (nat-posn? new-posn))
-      (error (format "Resulting block position is negative: ~v" new-posn))
+      (raise-tetris (format "Resulting block position is negative: ~v" new-posn))
       (struct-copy block blck
                    [posn new-posn])))
 
@@ -162,7 +162,7 @@
 
     ;; Error if pos is negative
     (check-exn
-     exn:fail?
+     exn:fail:tetris?
      (λ () (block-move (block (make-posn 0 0) (tile-normal 'L))
                        (make-posn -1 0))))
     ))
