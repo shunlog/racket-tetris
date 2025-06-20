@@ -17,10 +17,9 @@
 ;;   2. the sequence of input events and ticks, together with their timestamps
 ;; To replay, simply reproduce the sequence of function calls.
 
-;; Note that some functions can raise an error, which signifies a game over:
+;; Note that some functions can raise exn:fail:tetris:gameover, which signifies a game over:
 ;;   - tetris-on-tick
 ;;   - tetris-hard-drop
-;;   - tetris-hold
 
 ;; Note: the "*-pressed" and the "*-released" functions assume that
 ;; each press is followed by a release, which is not the case with the key autofire events,
@@ -42,6 +41,7 @@
 
 (require racket/contract)
 (provide
+ exn:fail:tetris:gameover?
  (contract-out
   [tetris? (-> any/c boolean?)]
   [new-tetris (->* (natural-number/c)
@@ -79,6 +79,15 @@
 
 ;; ----------------------------
 ;; Definitions
+
+
+(struct	exn:fail:tetris:gameover exn:fail:tetris ()
+  #:extra-constructor-name make-exn:fail:tetris:gameover
+  #:transparent)
+
+(define (raise-tetris-gameover msg)
+  (raise (make-exn:fail:tetris:gameover msg (current-continuation-marks))))
+
 
 
 ;; A Tetris is a struct:
@@ -139,7 +148,7 @@
 
 ;; call tetrion-move and update the lock timer if successful move
 (define (tetris--move t ms dirn)
-  (with-handlers ([exn:fail? (λ (e) t)])
+  (with-handlers ([exn:fail:tetris? (λ (e) t)])
     (define tn (tetris-tn t))
     (define new-tn (if (equal? dirn 'right)
                        (tetrion-right tn)
@@ -193,7 +202,7 @@
 ;; If the piece can't be dropped, try to lock it
 (define (tetris--drop t ms)
   (define tn (tetris-tn t))
-  (with-handlers ([exn:fail? (λ (e) (tetris-try-lock t ms))])
+  (with-handlers ([exn:fail:tetris? (λ (e) (tetris-try-lock t ms))])
     (define new-tn (tetrion-drop tn))
     (struct-copy tetris t
                  [tn new-tn]
@@ -271,10 +280,11 @@
   )
 
 
+
 ;; Spawn the next piece, while also resetting the lock and drop timers
 (define (tetris-spawn t ms)
   (define new-tn
-    (with-handlers ([exn:fail? (λ (_) (error "Game over: can't spawn"))])
+    (with-handlers ([exn:fail:tetris? (λ (_) (raise-tetris-gameover "Can't spawn"))])      
       (tetrion-spawn (tetris-tn t))))
   (struct-copy tetris t
                [tn new-tn]
@@ -284,7 +294,7 @@
 
 (define (tetris-lock t ms)
   (define tn-locked
-    (with-handlers ([exn:fail? (λ (_) (error "Game over: can't lock"))])
+    (with-handlers ([exn:fail:tetris? (λ (_) (raise-tetris-gameover "Can't lock"))])
       (~> (tetris-tn t)
           tetrion-lock)))
   (~> (struct-copy tetris t [tn tn-locked])
@@ -299,7 +309,7 @@
 
 
 (define (tetris--rotate t cw? ms)
-  (with-handlers ([exn:fail? (λ (e) t)])
+  (with-handlers ([exn:fail:tetris? (λ (e) t)])
     (define new-tn (tetrion-rotate (tetris-tn t) cw?))
     (struct-copy tetris t
                  [tn new-tn]
@@ -315,7 +325,7 @@
 
 (define (tetris-rotate-180 t ms)
   (define new-tn
-    (with-handlers ([exn:fail? (λ (e) (tetris-tn t))])
+    (with-handlers ([exn:fail:tetris? (λ (e) (tetris-tn t))])
       (tetrion-rotate-180 (tetris-tn t))))
   (struct-copy tetris t [tn new-tn]))
 
@@ -379,7 +389,7 @@
 ;; Tetris Natural -> Tetris
 ;; Put piece on hold if possible
 (define (tetris-hold t ms)
-  (with-handlers [(exn:fail? (λ (e) t))]
+  (with-handlers [(exn:fail:tetris? (λ (e) t))]
     (struct-copy tetris t
                  [tn (tetrion-hold (tetris-tn t))])))
 

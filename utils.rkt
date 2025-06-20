@@ -6,12 +6,26 @@
 
 
 (provide
+ exn:fail:tetris
+ exn:fail:tetris?
+ raise-tetris
  (contract-out
   [block-lists=? (-> (listof any/c) (listof any/c) boolean?)]
   [matrix-rotate-cw (-> (listof (listof any/c))
                         (listof (listof any/c)))]
   [de-nest (-> (listof any/c) (listof any/c))]
   [posn+ (-> posn? posn? posn?)]))
+
+
+;;; Exception raised whenever the action breaks the rules of tetris,
+;;; for example when a block is placed on top of another, or outside the playfield,
+;;; or when the piece can't be moved in the given direction
+(struct	exn:fail:tetris exn:fail ()
+  #:extra-constructor-name make-exn:fail:tetris
+  #:transparent)
+
+(define (raise-tetris msg)
+  (raise (make-exn:fail:tetris msg (current-continuation-marks))))
 
 
 ;; List List -> Boolean

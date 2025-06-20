@@ -19,7 +19,7 @@
 
 ;; Note:
 ;; I think raising exceptions on failure is better than either:
-;;   1. returning #f, or
+;;   1. returning #f or null, or
 ;;   2. returning an unmodified Tetrion
 ;; In the 1st case, we could forget to check for the false value, and it would propagate further
 ;; In the 2nd case, we would have to double check if the piece has moved, which is redundant
@@ -37,6 +37,7 @@
                      #:queue-size natural-number/c)
                     tetrion?)]
   [tetrion? (-> any/c boolean?)]
+
 
   ;; Accessors
   [tetrion-playfield (->* (tetrion?) (boolean?) playfield?)]
@@ -59,7 +60,6 @@
   [tetrion-spawn-shape (-> tetrion? shape-name/c tetrion?)]
   [tetrion-add-garbage (-> tetrion? natural-number/c tetrion?)]
   ))
-
 
 ; -------------------------------
 ; Requires
@@ -164,7 +164,7 @@
   (define current-sn (~> tn tetrion-piece piece-shape-name))
   (define sn-on-hold (~> tn tetrion-on-hold))
   (cond
-    [(not (tetrion-can-hold tn)) (error "Can't hold piece.")]
+    [(not (tetrion-can-hold tn)) (raise-tetris "Can't hold piece")]
     [(not sn-on-hold)                   ; no piece on hold yet
      (~> (tetrion-spawn tn)
          (struct-copy tetrion _ [on-hold current-sn] [can-hold #f]))]
@@ -198,7 +198,7 @@
   (test-case
       "Can't hold twice in a row"
     (define tn0 (~> (new-tetrion) tetrion-spawn tetrion-hold))
-    (check-exn exn:fail?
+    (check-exn exn:fail:tetris?
                (λ () (tetrion-hold tn0)))
     (check-not-exn
      (λ () (~> tn0 tetrion-spawn tetrion-hold)))))
@@ -230,7 +230,7 @@
   (cond
     [(not (playfield-can-place? (tetrion-locked tn)
                                 (piece-blocks new-piece)))
-     (error "Can't spawn piece (block out)")]
+     (raise-tetris "Can't spawn piece (block out)")]
     [else (struct-copy tetrion tn
                        [piece new-piece])]))
 
@@ -373,11 +373,11 @@
     [(playfield-can-place? locked (piece-blocks moved-piece))
      (struct-copy tetrion tn
                   [piece moved-piece])]
-    [else (error "Can't move piece by " posn)]))
+    [else (raise-tetris (format "Can't move piece by ~v" posn))]))
 
 
 ;; Rotate cw or ccw,
-;; Raise exn:fail if can't rotate
+;; Raise exn:fail:tetris if can't rotate
 (define (tetrion-rotate tn cw?)
   (define p (tetrion-piece tn))
   (define shape-name (piece-shape-name p))
@@ -389,7 +389,7 @@
 
   (define (moved-or-false kick)
     (with-handlers
-      ([exn:fail? (λ (e) #f)])
+      ([exn:fail:tetris? (λ (e) #f)])
       (tetrion-move tn-rotated (make-posn (car kick) (cadr kick)))))
 
   (define new-tn
@@ -398,7 +398,7 @@
       (moved-or-false kick)))
 
   (cond
-    [(not new-tn) (error "Can't rotate piece." tn)]
+    [(not new-tn) (raise-tetris (format "Can't rotate piece ~v" (if cw? "cw" "ccw")))]
     [else new-tn]))
 
 (module+ test
@@ -442,10 +442,10 @@
   )
 
 
-;; Rotate 180, raise exn:fail if can't
+;; Rotate 180, raise exn:fail:tetris if can't
 (define (tetrion-rotate-180 tn)
   (define (try-rotate-cw ft1)
-    (with-handlers ([exn:fail? (λ (e) #f)])
+    (with-handlers ([exn:fail:tetris? (λ (e) #f)])
       (tetrion-rotate ft1 #t)))
   (define (try-change-rotation)
     (define p (tetrion-piece tn))
@@ -458,7 +458,7 @@
    (try-change-rotation)
    ;; try rotating twice clockwise
    (and~> tn try-rotate-cw try-rotate-cw)
-   (error "Can't rotate 180.")))
+   (raise-tetris "Can't rotate 180")))
 
 (module+ test
   (test-case
@@ -515,24 +515,24 @@
 
     ;; Fail on collision with locked blocks
     (check-exn
-     exn:fail?
+     exn:fail:tetris?
      (λ () (tetrion-move ft0-drop (make-posn 0 -1))))
 
     ;; Fail on collision with bottom of playfield
     (define ft1 (~> (new-tetrion #:cols 3 #:rows 0)
                     (tetrion-spawn-shape 'L)))
     (check-exn
-     exn:fail?
+     exn:fail:tetris?
      (λ () (tetrion-move ft1 (make-posn 0 -1))))
 
     ;; Fail on collision with right border
     (check-exn
-     exn:fail?
+     exn:fail:tetris?
      (λ () (tetrion-move ft1 (make-posn 1 0))))
 
     ;; Fail on collision with left border
     (check-exn
-     exn:fail?
+     exn:fail:tetris?
      (λ () (tetrion-move ft1 (make-posn -1 0))))
 
     ;; Should work on new instance
@@ -555,7 +555,7 @@
 ;; Move the Piece as far down as possible
 (define (tetrion-hard-drop tn)
   (define dropped
-    (with-handlers ([exn:fail? (λ (e) #f)])
+    (with-handlers ([exn:fail:tetris? (λ (e) #f)])
       (tetrion-drop tn)))
   (if (not dropped)
       tn
@@ -620,7 +620,7 @@
 ; Tetrion -> Tetrion
 ; Locks piece (adds the blocks to `locked`) and clears it (sets it to #f),
 ; and clears the full rows.
-; Raises error on lock out, when all its blocks are in the vanish zone.
+; Raises signal on lock out, when all its blocks are in the vanish zone.
 (define (tetrion-lock tn)
   (define rows (playfield-rows (tetrion-locked tn)))
   (define piece-min-y (~> (tetrion-piece tn)
@@ -629,7 +629,7 @@
                           (apply min _)))
   (cond
     [(>= piece-min-y rows)
-     (error "All piece blocks above ceiling: lock out")]
+     (raise-tetris "All piece blocks above ceiling: lock out")]
     [else
      (define piece-blcks (~> tn tetrion-piece piece-blocks))
      (define-values (new-locked num-cleared)
