@@ -9,7 +9,7 @@
 ;; Constants
 
 
-(define FPS 120)
+(define FPS 60)
 (define FRAME-LABEL "World")
 (define ROWS 20)
 (define COLS 10)

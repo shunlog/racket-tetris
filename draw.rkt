@@ -41,7 +41,7 @@
         'I (make-color 0 247 255)
         'O (make-color 242 235 12)))
 
-(define BLOCK-W 32)
+(define BLOCK-W 22)
 
 (define GHOST-ALPHA 0.3)
 (define VANISH-LINES 2)    ; number of rows to draw in the vanish zone
