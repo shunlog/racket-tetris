@@ -69,9 +69,10 @@
 ;; -------------------------------
 ;; State variables
 
-
 ;; The Tetris state will be mutated for simplicity
 (define tetris (make-new-tetris))
+(define running? #f)
+
 
 ;; The (millis) when the game started
 (define ms-start 0)
@@ -79,6 +80,28 @@
 
 ; -------------------------------
 ; Implementation
+
+
+
+;; Tetris Key-event -> Tetris
+;; Get the new state of the global tetris on key event
+(define (tetris-on-event tetris key-ev)  
+  (case (send key-ev get-key-code)
+     [(left) (tetris-left-pressed tetris (millis))]
+     [(right) (tetris-right-pressed tetris (millis))]
+     [(up #\x) (tetris-rotate-cw tetris (millis))]
+     [(#\z) (tetris-rotate-ccw tetris (millis))]
+     [(#\a) (tetris-rotate-180 tetris (millis))]
+     [(#\space) (tetris-hard-drop tetris (millis))]
+     [(#\c) (tetris-hold tetris (millis))]
+     [(down) (tetris-soft-drop-pressed tetris (millis))]
+     [(release)
+      (case (send key-ev get-key-release-code)
+        [(left) (tetris-left-released tetris (millis))]
+        [(right) (tetris-right-released tetris (millis))]
+        [(down) (tetris-soft-drop-released tetris (millis))]
+        [else tetris])]
+     [else tetris]))
 
 
 ;; Override the frame%'s event handler,
@@ -99,10 +122,7 @@
 
       (unless ;; filter autofire
           (and was-pressed? pressed?)
-        (on-tetris-event event))
-
-      (case (send event get-key-code)
-        [(f4) (restart-game)])
+        (tetris-frame-on-event event))
       
       (hash-set! keys-state-hash key-code pressed?)
       #f  ;; return #f to pass the event further
@@ -111,26 +131,14 @@
 
 ;; Key-event -> void
 ;; Update the tetris on key press/release
-(define (on-tetris-event key-ev)
-  (define new-tetris
-    (with-handlers ([exn:fail:tetris:gameover? (λ (_) (game-over))])
-      (case (send key-ev get-key-code)
-        [(left) (tetris-left-pressed tetris (millis))]
-        [(right) (tetris-right-pressed tetris (millis))]
-        [(up #\x) (tetris-rotate-cw tetris (millis))]
-        [(#\z) (tetris-rotate-ccw tetris (millis))]
-        [(#\a) (tetris-rotate-180 tetris (millis))]
-        [(#\space) (tetris-hard-drop tetris (millis))]
-        [(#\c) (tetris-hold tetris (millis))]
-        [(down) (tetris-soft-drop-pressed tetris (millis))]
-        [(release)
-         (case (send key-ev get-key-release-code)
-           [(left) (tetris-left-released tetris (millis))]
-           [(right) (tetris-right-released tetris (millis))]
-           [(down) (tetris-soft-drop-released tetris (millis))])])))
-  (if (void? new-tetris)
-      (void)
-      (set! tetris new-tetris)))
+(define (tetris-frame-on-event key-ev)
+  (cond
+    [(eq? 'f4 (send key-ev get-key-code))
+     (restart-game)]
+    [(not running?) (void)]
+    [else (with-handlers
+            ([exn:fail:tetris:gameover? (λ (_) (game-over))])
+            (set! tetris (tetris-on-event tetris key-ev)))]))
 
 
 ;; void -> void
@@ -281,6 +289,7 @@
 
 (define (game-over)
   (send timer stop)
+  (set! running? #f)
   (send game-over-msg show #t)
   (update-canvases))
 
@@ -288,6 +297,7 @@
 (define (restart-game)
   (set! tetris (make-new-tetris))
   (send timer start TIMER-INTERVAL)
+  (set! running? #t)
   (set! ms-start (millis))
   (send game-over-msg show #f))
 
