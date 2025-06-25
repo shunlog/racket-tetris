@@ -116,7 +116,9 @@
 ;; Use hash so it uses (equal?) to compare values,
 ;; Otherwise comparing Tiles (which are cons) would return false
 (define/memoize (tile-bitmap tile ) #:hash hash
-  (bitmap (tile-pict tile)))
+  (bitmap (if (not tile)
+              (blank BLOCK-W BLOCK-W)
+              (tile-pict tile))))
 
 (define (playfield-pict plf)
   (define rows (playfield-rows plf))
@@ -129,9 +131,7 @@
    (rectangle (* cols BLOCK-W) (* VANISH-LINES BLOCK-W)
               #:border-color "gray"
               #:border-width 3)
-   (table cols (map (λ (tile)
-                      (if (not tile) (blank BLOCK-W BLOCK-W) (tile-bitmap tile)))
-                    tile-ls)
+   (table cols (map (λ (tile) (tile-bitmap tile)) tile-ls)
           cc-superimpose cc-superimpose 0 0)))
 
 ;; Tetrion -> Pict
