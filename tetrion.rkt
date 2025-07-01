@@ -44,7 +44,7 @@
   [tetrion-queue (-> tetrion? (listof shape-name/c))]
   [tetrion-on-hold (-> tetrion? (or/c #f shape-name/c))]
   [tetrion-cleared (-> tetrion? natural-number/c)]
-
+  
   ;; Movement
   [tetrion-drop (-> tetrion? tetrion?)]
   [tetrion-hard-drop (-> tetrion? tetrion?)]
@@ -59,6 +59,7 @@
   [tetrion-spawn (-> tetrion? tetrion?)]
   [tetrion-spawn-shape (-> tetrion? shape-name/c tetrion?)]
   [tetrion-add-garbage (-> tetrion? natural-number/c tetrion?)]
+  [tetrion-revert (-> tetrion? tetrion?)]
   ))
 
 ; -------------------------------
@@ -86,7 +87,17 @@
 ; - can-hold: boolean - whether it is legal to put the current piece on hold.
 ;        by default, if the current piece was obtained from the hold, you can't put it back on hold.
 ; - cleared: (natural) - number of lines cleared so far
-(struct tetrion [piece locked shape-generator queue on-hold can-hold cleared])
+(struct tetrion
+  [piece
+   locked
+   shape-generator
+   queue
+   on-hold
+   can-hold
+   cleared
+   [checkpoint1 #:mutable]        ; the tetrion when a piece was last spawned
+   checkpoint2    ; the tetrion when a piece was spawned second to last time
+   ])
 
 
 ; A Piece is either #f or a struct:
@@ -131,7 +142,7 @@
   (define locked (~> (empty-playfield cols rows)
                      (playfield-add-blocks locked-blocks)))
   (define queue (build-list queue-size (λ (_) (shape-generator))))
-  (tetrion #f locked shape-generator queue #f #t 0))
+  (tetrion #f locked shape-generator queue #f #t 0 null null))
 
 
 ;; Tetrion -> Tetrion
@@ -140,10 +151,15 @@
   (define next-shape (car (tetrion-queue tn)))
   (define new-shape ((tetrion-shape-generator tn)))
   (define new-queue (append (cdr (tetrion-queue tn)) (list new-shape)))
-  (~> (tetrion-spawn-shape tn next-shape)
-      (struct-copy tetrion _
-                   [queue new-queue]
-                   [can-hold #t])))
+  (define tn1
+    (~> (tetrion-spawn-shape tn next-shape)
+        (struct-copy tetrion _
+               [queue new-queue]
+               [can-hold #t]
+               [checkpoint2 (tetrion-checkpoint1 tn)])))
+  (set-tetrion-checkpoint1! tn1 tn1)
+  tn1
+  )
 
 
 (module+ test
@@ -671,3 +687,9 @@
     (playfield-add-garbage (tetrion-locked tion) n))
   (struct-copy tetrion tion
                [locked new-locked]))
+
+(define (tetrion-revert t)
+  (define t-prev (tetrion-checkpoint2 t))
+  (if (null? t-prev)
+      (raise-tetris "Can't revert further")
+      t-prev))
