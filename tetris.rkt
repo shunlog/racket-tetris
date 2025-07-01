@@ -64,6 +64,7 @@
   [tetris-hard-drop (-> tetris? natural-number/c tetris?)]
   [tetris-hold (-> tetris? natural-number/c tetris?)]
   [tetris-on-tick (-> tetris? natural-number/c tetris?)]
+  [tetris-revert (-> tetris? tetris?)]
   ))
 
 
@@ -409,3 +410,9 @@
 (define (tetris-tetrions=? t1 t2)
   (eq? (tetris-tn t1) (tetris-tn t2))
   )
+
+(define (tetris-revert t)
+  (with-handlers
+    ([exn:fail:tetris? (λ (e) t)])
+    (struct-copy tetris t
+                [tn (tetrion-revert (tetris-tn t))])))

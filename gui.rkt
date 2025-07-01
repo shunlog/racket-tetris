@@ -95,6 +95,7 @@
      [(#\space) (tetris-hard-drop tetris (millis))]
      [(#\c) (tetris-hold tetris (millis))]
      [(down) (tetris-soft-drop-pressed tetris (millis))]
+     [(#\s) (tetris-revert tetris)]
      [(release)
       (case (send key-ev get-key-release-code)
         [(left) (tetris-left-released tetris (millis))]
