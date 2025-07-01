@@ -49,6 +49,7 @@
                    tetris?)]
   [tetris-tn (-> tetris? tetrion?)]
   [tetris-fps (-> tetris? number?)]
+  [tetris-tetrions=? (-> tetris? tetris? boolean?)]
 
   ;; Event handlers
   [tetris-left-pressed (-> tetris? natural-number/c tetris?)]
@@ -401,3 +402,10 @@
       (tetris-fps-tick ms)
       (tetris-gravity-tick ms)
       (tetris-autoshift-tick ms)))
+
+
+;; Tetris Tetris -> Boolean
+;; Useful for checking when no action has happened to avoid redundant redraws
+(define (tetris-tetrions=? t1 t2)
+  (eq? (tetris-tn t1) (tetris-tn t2))
+  )

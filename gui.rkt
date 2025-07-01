@@ -9,7 +9,7 @@
 ;; Constants
 
 
-(define FPS 60)
+(define FPS 120)
 (define FRAME-LABEL "World")
 (define ROWS 20)
 (define COLS 10)
@@ -138,17 +138,23 @@
     [(not running?) (void)]
     [else (with-handlers
             ([exn:fail:tetris:gameover? (λ (_) (game-over))])
-            (set! tetris (tetris-on-event tetris key-ev)))]))
+            (define old-t tetris)
+            (set! tetris (tetris-on-event tetris key-ev))
+            (unless (tetris-tetrions=? old-t tetris)
+              (update-canvases)))]))
 
 
 ;; void -> void
 ;; Update the tetris on a clock tick (called by timer)
 (define (on-tick)
   ;; (yield)
+  (define old-t tetris)
   (set! tetris (tetris-on-tick tetris (millis)))
+  (unless (tetris-tetrions=? old-t tetris)
+    (update-canvases))
   (send lines-cleared-msg set-label (number->string (tetrion-cleared (tetris-tn tetris))))
   (send timer-msg set-label (millis->string (- (millis) ms-start)))
-  (update-canvases))
+)
 
 
 (define (update-canvases)
