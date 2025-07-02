@@ -57,7 +57,7 @@
   [tetrion-lock (-> tetrion? tetrion?)]
   [tetrion-hold (-> tetrion? tetrion?)]
   [tetrion-spawn (-> tetrion? tetrion?)]
-  [tetrion-spawn-shape (-> tetrion? shape-name/c tetrion?)]
+  [tetrion--set-shape (-> tetrion? shape-name/c tetrion?)]
   [tetrion-add-garbage (-> tetrion? natural-number/c tetrion?)]
   [tetrion-revert (-> tetrion? tetrion?)]
   ))
@@ -145,21 +145,25 @@
   (tetrion #f locked shape-generator queue #f #t 0 null null))
 
 
+
 ;; Tetrion -> Tetrion
 ;; Spawn the shape popped from the queue and push the next generated one
-(define (tetrion-spawn tn)
+(define (tetrion--spawn tn)
   (define next-shape (car (tetrion-queue tn)))
   (define new-shape ((tetrion-shape-generator tn)))
   (define new-queue (append (cdr (tetrion-queue tn)) (list new-shape)))
-  (define tn1
-    (~> (tetrion-spawn-shape tn next-shape)
-        (struct-copy tetrion _
-               [queue new-queue]
-               [can-hold #t]
-               [checkpoint2 (tetrion-checkpoint1 tn)])))
-  (set-tetrion-checkpoint1! tn1 tn1)
-  tn1
-  )
+  (~> (struct-copy tetrion tn
+                   [queue new-queue])
+      (tetrion--set-shape _ next-shape)))
+
+
+;; Tetrion -> Tetrion
+;; like tetrion--spawn, but also create a checkpoint and reset the on-hold flag
+(define (tetrion-spawn tn)
+  (~> (tetrion--spawn tn)
+      (struct-copy tetrion _
+                   [can-hold #t])
+      (tetrion-set-checkpoint _)))
 
 
 (module+ test
@@ -182,11 +186,14 @@
   (cond
     [(not (tetrion-can-hold tn)) (raise-tetris "Can't hold piece")]
     [(not sn-on-hold)                   ; no piece on hold yet
-     (~> (tetrion-spawn tn)
-         (struct-copy tetrion _ [on-hold current-sn] [can-hold #f]))]
+     (~> (tetrion--spawn tn)
+         (struct-copy tetrion _ [on-hold current-sn] [can-hold #f])
+         (tetrion-set-checkpoint _)
+         )]
     [else
-     (~> (tetrion-spawn-shape tn sn-on-hold)
-         (struct-copy tetrion _ [on-hold current-sn] [can-hold #f]))]))
+     (~> (tetrion--set-shape tn sn-on-hold)
+         (struct-copy tetrion _ [on-hold current-sn] [can-hold #f])
+         (tetrion-set-checkpoint _))]))
 
 (module+ test
   (test-case
@@ -220,10 +227,18 @@
      (λ () (~> tn0 tetrion-spawn tetrion-hold)))))
 
 
+(define (tetrion-set-checkpoint tn)
+  (define tn1
+    (struct-copy tetrion tn
+                 [checkpoint2 (tetrion-checkpoint1 tn)]))
+  (set-tetrion-checkpoint1! tn1 tn1)
+  tn1)
+
+
 ;; Spawn a Piece according to the specified shape-name.
 ;; If the coordinates are not specified,
 ;; the piece will be centered at the bottom of the vanish zone.
-(define (tetrion-spawn-shape tn
+(define (tetrion--set-shape tn
                              shape-name
                              #:x [x #f]
                              #:y [y #f]
@@ -243,12 +258,13 @@
                       (- rows (apply min (map posn-y shape-posns)))))
   (define new-piece
     (piece (make-posn piece-x piece-y) shape-name rotation))
-  (cond
-    [(not (playfield-can-place? (tetrion-locked tn)
-                                (piece-blocks new-piece)))
-     (raise-tetris "Can't spawn piece (block out)")]
-    [else (struct-copy tetrion tn
-                       [piece new-piece])]))
+  (unless
+      (playfield-can-place? (tetrion-locked tn)
+                            (piece-blocks new-piece))
+    (raise-tetris "Can't spawn piece (block out)"))
+  (struct-copy tetrion tn
+               [piece new-piece])  
+  )
 
 
 (module+ test
@@ -256,9 +272,9 @@
       "Spawn a piece in the middle when symmetric"
     (define ft0
       (~> (new-tetrion #:cols 10 #:rows 2)
-          (tetrion-spawn-shape 'L)))
+          (tetrion--set-shape 'L)))
     (check block-lists=?
-           (~> ft0 (tetrion-spawn-shape 'L) tetrion-playfield playfield-blocks)
+           (~> ft0 (tetrion--set-shape 'L) tetrion-playfield playfield-blocks)
            (strings->blocks '(".....L...."
                               "...LLL...."
                               ".........."
@@ -268,7 +284,7 @@
       "Spawn a piece on the left of the middle when asymmetric"
     (define ft1
       (~> (new-tetrion #:cols 10 #:rows 2)
-          (tetrion-spawn-shape 'I)))
+          (tetrion--set-shape 'I)))
     (check block-lists=?
            (~> ft1 tetrion-playfield playfield-blocks)
            (strings->blocks '("...IIII..."
@@ -279,7 +295,7 @@
       "Spawn piece at a specific position and rotation"
     (define ft0
       (~> (new-tetrion #:cols 4 #:rows 10)
-          (tetrion-spawn-shape 'T #:x 0 #:y 0 #:rotation 3)))
+          (tetrion--set-shape 'T #:x 0 #:y 0 #:rotation 3)))
     (check block-lists=?
            (~> ft0 tetrion-playfield playfield-blocks)
            (strings->blocks '(".T.."
@@ -290,7 +306,7 @@
       "Spawn piece in vanish zone with specific rotation"
     (define ft0
       (~> (new-tetrion #:cols 4 #:rows 1)
-          (tetrion-spawn-shape 'I #:rotation 1)))
+          (tetrion--set-shape 'I #:rotation 1)))
     (check block-lists=?
            (~> ft0 tetrion-playfield playfield-blocks)
            (strings->blocks '(".I.."
@@ -305,7 +321,7 @@
       (new-tetrion #:locked-blocks (list (block (make-posn 5 21) (tile-normal 'I)))))
     (check-exn
      #rx"block out"
-     (λ () (tetrion-spawn-shape tn-full 'L))))
+     (λ () (tetrion--set-shape tn-full 'L))))
   )
 
 
@@ -327,7 +343,7 @@
       "Get piece blocks"
     (define ft0
       (~> (new-tetrion #:cols 10 #:rows 2)
-          (tetrion-spawn-shape 'L)))
+          (tetrion--set-shape 'L)))
     (check block-lists=?
            (~> ft0 tetrion-piece piece-blocks)
            (strings->blocks '(".....L...."
@@ -354,7 +370,7 @@
 
 (module+ test
   (define ft1 (~> (new-tetrion #:cols 4 #:rows 1)
-                  (tetrion-spawn-shape 'T)))
+                  (tetrion--set-shape 'T)))
   (define piece-blocks1
     (strings->blocks '(".T."
                        "TTT"
@@ -421,7 +437,7 @@
   (test-case
       "Rotate cw"
     (define ft0 (~> (new-tetrion #:cols 4 #:rows 2)
-                    (tetrion-spawn-shape 'L)))
+                    (tetrion--set-shape 'L)))
 
     ;; assert initial setup
     (check block-lists=?
@@ -441,7 +457,7 @@
   (test-case
       "Rotate 90 with wall kick"
     (define ft2 (~> (new-tetrion #:cols 4 #:rows 2)
-                    (tetrion-spawn-shape #:x -1 #:y 1 'L #:rotation 1)))
+                    (tetrion--set-shape #:x -1 #:y 1 'L #:rotation 1)))
     ;; assert initial setup
     (check block-lists=?
            (playfield-blocks (tetrion-playfield ft2))
@@ -485,7 +501,7 @@
            #:locked-blocks (strings->blocks '("OO."
                                               "..."
                                               ".OO")))
-          (tetrion-spawn-shape 'L #:x 0 #:y 0 #:rotation 0)))
+          (tetrion--set-shape 'L #:x 0 #:y 0 #:rotation 0)))
 
     ;; assert initial setup
     (check
@@ -513,7 +529,7 @@
       "Move the tetrion piece"
     (define ft0 (~> (new-tetrion #:cols 4 #:rows 2
                                  #:locked-blocks (strings->blocks '("JJ..")))
-                    (tetrion-spawn-shape 'I)))
+                    (tetrion--set-shape 'I)))
 
     ;; check assumption
     (check block-lists=?
@@ -536,7 +552,7 @@
 
     ;; Fail on collision with bottom of playfield
     (define ft1 (~> (new-tetrion #:cols 3 #:rows 0)
-                    (tetrion-spawn-shape 'L)))
+                    (tetrion--set-shape 'L)))
     (check-exn
      exn:fail:tetris?
      (λ () (tetrion-move ft1 (make-posn 0 -1))))
@@ -582,7 +598,7 @@
   (test-case
       "Hard drop to the floor"
     (define ft0 (~> (new-tetrion #:cols 4 #:rows 2)
-                    (tetrion-spawn-shape 'O)))
+                    (tetrion--set-shape 'O)))
     ;; assert initial setup
     (check
      block-lists=?
@@ -605,7 +621,7 @@
   (test-case
       "Hard drop to a block"
     (define ft0 (~> (new-tetrion #:cols 4 #:rows 3)
-                    (tetrion-spawn-shape 'O)))
+                    (tetrion--set-shape 'O)))
     (define plf1 (playfield-add-blocks (tetrion-locked ft0)
                                        (strings->blocks '("LL.."))))
     (define ft1 (struct-copy tetrion ft0 [locked plf1]))
@@ -664,7 +680,7 @@
   (test-case
       "Lock out if locked right after spawn (since pieces spawn above the ceiling)"
     (define ft0 (~> (new-tetrion )
-                    (tetrion-spawn-shape 'L)))
+                    (tetrion--set-shape 'L)))
     (check-exn
      #rx"lock out"
      (λ () (tetrion-lock ft0))))
@@ -675,7 +691,7 @@
     (define tn-dropped
       (~> (new-tetrion)
           ;; assuming the I will be spawned on the bottom of the vanish zone
-          (tetrion-spawn-shape 'I #:rotation 1)
+          (tetrion--set-shape 'I #:rotation 1)
           ;; move the I so 1 block is below vanish zone
           tetrion-drop))
     (check-not-exn
