@@ -183,17 +183,16 @@
 (define (tetrion-hold tn)
   (define current-sn (~> tn tetrion-piece piece-shape-name))
   (define sn-on-hold (~> tn tetrion-on-hold))
-  (cond
-    [(not (tetrion-can-hold tn)) (raise-tetris "Can't hold piece")]
-    [(not sn-on-hold)                   ; no piece on hold yet
-     (~> (tetrion--spawn tn)
-         (struct-copy tetrion _ [on-hold current-sn] [can-hold #f])
-         (tetrion-set-checkpoint _)
-         )]
-    [else
-     (~> (tetrion--set-shape tn sn-on-hold)
-         (struct-copy tetrion _ [on-hold current-sn] [can-hold #f])
-         (tetrion-set-checkpoint _))]))
+  (unless (tetrion-can-hold tn)
+    (raise-tetris "Can't hold piece"))
+  (define tn1
+    (if (not sn-on-hold)
+        (tetrion--spawn tn)
+        (tetrion--set-shape tn sn-on-hold)))
+  (~> tn1
+      (struct-copy tetrion _ [on-hold current-sn] [can-hold #f])
+      (tetrion-set-checkpoint _)))
+
 
 (module+ test
   (test-case
