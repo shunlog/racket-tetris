@@ -42,6 +42,7 @@
 (require racket/contract)
 (provide
  exn:fail:tetris:gameover?
+ raise-tetris-gameover
  (contract-out
   [tetris? (-> any/c boolean?)]
   [new-tetris (->* (natural-number/c)
