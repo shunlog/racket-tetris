@@ -15,6 +15,7 @@
 (define COLS 10)
 (define GARBAGE-ROWS 0)
 (define QUEUE-SIZE 5)
+(define LINES-CLEARED-GOAL 5)
 
 (define TIMER-INTERVAL (inexact->exact (round (/ 1000 FPS))))
 
@@ -138,11 +139,14 @@
      (restart-game)]
     [(not running?) (void)]
     [else (with-handlers
-            ([exn:fail:tetris:gameover? (λ (_) (game-over))])
+            ([exn:fail:tetris:gameover? (λ (msg) (game-over msg))])
             (define old-t tetris)
             (set! tetris (tetris-on-event tetris key-ev))
             (unless (tetris-tetrions=? old-t tetris)
-              (update-canvases)))]))
+              (update-canvases))
+            (when (<= LINES-CLEARED-GOAL (tetrion-cleared (tetris-tn tetris)))
+              (raise-tetris-gameover "Cleared all the lines")))])
+  (send lines-cleared-count-msg set-label (number->string (tetrion-cleared (tetris-tn tetris)))))
 
 
 ;; void -> void
@@ -153,7 +157,6 @@
   (set! tetris (tetris-on-tick tetris (millis)))
   (unless (tetris-tetrions=? old-t tetris)
     (update-canvases))
-  (send lines-cleared-msg set-label (number->string (tetrion-cleared (tetris-tn tetris))))
   (send timer-msg set-label (millis->string (- (millis) ms-start)))
 )
 
@@ -216,7 +219,6 @@
        [spacing 20]
        [alignment '(center top)]))
 
-
 (define hold-piece-canvas
   (new canvas%
        [parent horiz-pane]
@@ -234,7 +236,7 @@
 (define main-vert-pane
   (new vertical-pane%
        [parent horiz-pane]
-       [spacing 20]
+       [spacing 10]
        [alignment '(center top)]))
 
 (define queue-canvas
@@ -254,6 +256,7 @@
           (define pic (queue-pict queue))
           (draw-pict pic dc 0 0))]))
 
+
 (define tetris-canvas
   (new canvas%
        [parent main-vert-pane]
@@ -268,6 +271,28 @@
           (define pic (playfield-pict plf))
           (draw-pict pic dc 0 0))]))
 
+(define timer-msg
+  (new message%
+       [label "[timer..........]"]
+       [parent main-vert-pane]))
+
+(define goal-msg
+  (new message%
+       [label (format "Sprint: Clear ~v lines" LINES-CLEARED-GOAL)]
+       [parent main-vert-pane]))
+
+(define lines-cleared-pane
+  (new horizontal-pane%
+       [parent main-vert-pane]
+       [alignment '(center top)]))
+(define lines-cleared-msg
+  (new message%
+       [label "Lines cleared:"]
+       [parent lines-cleared-pane]))
+(define lines-cleared-count-msg
+  (new message%
+       [label "0"]
+       [parent lines-cleared-pane]))
 
 (define game-over-msg
   (new message%
@@ -276,28 +301,17 @@
 (send game-over-msg show #f)
 
 
-(define lines-cleared-msg
-  (new message%
-       [label "0"]
-       [parent main-vert-pane]))
-
-
-(define timer-msg
-  (new message%
-       [label "0"]
-       [parent main-vert-pane]))
-
-
 ;; Make sure the timer doesn't start automatically
 (define timer
   (new timer%
        [notify-callback on-tick]))
 
 
-(define (game-over)
+(define (game-over msg)
   (send timer stop)
   (set! running? #f)
   (send game-over-msg show #t)
+  (println msg)
   (update-canvases))
 
 
@@ -306,7 +320,8 @@
   (send timer start TIMER-INTERVAL)
   (set! running? #t)
   (set! ms-start (millis))
-  (send game-over-msg show #f))
+  (send game-over-msg show #f)
+  (update-canvases))
 
 
 (send frame show #t)
