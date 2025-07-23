@@ -20,7 +20,7 @@
   [tile-ghost (-> shape-name/c tile?)]
   [tile-shape (-> tile? shape-name/c)]
   [TILE-GARBAGE tile?]
-  [TILE-GHOST tile?]
+  [TILE-GHOST-L tile?]
   
   [struct block ((posn nat-posn?) (tile tile?))]
   [strings->blocks (-> block-strings/c (listof block/c))]
@@ -56,7 +56,7 @@
 (struct tile [type shape] #:transparent)
 
 ;; Examples
-(define TILE-GHOST (tile 'ghost 'L))
+(define TILE-GHOST-L (tile 'ghost 'L))
 
 ;; Since there's only one kind of garbage tile, we'll export it as a constant
 (define TILE-GARBAGE (tile 'garbage #f))
@@ -84,7 +84,7 @@
 (define block/c (struct/c block nat-posn? tile?))
 ;; Examples:
 (define BLOCK-GARBAGE (block (make-posn 0 0) TILE-GARBAGE))
-(define BLOCK-GHOST-L (block (make-posn 5 6) TILE-GHOST))
+(define BLOCK-GHOST-L (block (make-posn 5 6) TILE-GHOST-L))
 
 
 ; -------------------------------

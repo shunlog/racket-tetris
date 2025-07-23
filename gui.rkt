@@ -5,31 +5,44 @@
 ;; Time is measured using (millis),
 ;; which returns the monotonic, inexact, rounded number of ms.
 
+(require threading
+         racket/gui
+         pict
+         mode-lambda
+         mode-lambda/static
+         mode-lambda/backend/gl
+         "tetris.rkt"
+         "draw.rkt"
+         "tetrion.rkt"
+         "playfield.rkt"
+         "block.rkt"
+         "shapes.rkt"
+         lang/posn
+         racket/fixnum)
+
 ;; -------------------------------
 ;; Constants
 
-
-(define FPS 120)
+(define FPS 60)
 (define FRAME-LABEL "World")
-(define ROWS 20)
-(define COLS 10)
-(define GARBAGE-ROWS 0)
+
+(define ROWS 30)
+(define COLS 50)
+(define VANISH-LINES 2)
+(define ROWS-TOTAL (+ ROWS VANISH-LINES))
+
+(define GARBAGE-ROWS 20)
 (define QUEUE-SIZE 5)
 (define LINES-CLEARED-GOAL 5)
 
+(define LAYERS 8)            ; mode-lambda layers, unsafe limit is 256
+
+
 (define TIMER-INTERVAL (inexact->exact (round (/ 1000 FPS))))
 
-; -------------------------------
-; Requires
-
-
-(require threading)
-(require racket/gui)
-(require pict)
-(require "tetris.rkt")
-(require "draw.rkt")
-(require "tetrion.rkt")
-
+;;; Playfield canvas size
+(define W (* BLOCK-W COLS))
+(define H (* BLOCK-W ROWS-TOTAL))
 
 ; -------------------------------
 ; Helpers
@@ -178,15 +191,80 @@
   (send hold-piece-canvas refresh-now))
 
 
+
+;; ----------------------------
+;; Set up mode-lambda sprites
+
+
+(define db (make-sprite-db))
+
+;;; Convert tile to symbol,
+;;; Needed for the mode-lambda sprite database to index tiles
+(define (tile->sym tile)
+  (cond
+    [(tile-garbage? tile) 'garbage]
+    [(tile-ghost? tile)
+     (string->symbol (string-append "ghost-" (symbol->string (tile-shape tile))))]
+    [else
+     (string->symbol (string-append "normal-" (symbol->string (tile-shape tile))))]))
+
+;;; Generate picts for each possible tile
+(for ([sn SHAPE-NAMES])
+  (define tile (tile-normal sn))
+  (define tilepict (tile-pict tile))
+  (add-sprite!/value db (tile->sym tile) tilepict))
+(for ([sn SHAPE-NAMES])
+  (define tile (tile-ghost sn))
+  (define tilepict (tile-pict tile))
+  (add-sprite!/value db (tile->sym tile) tilepict))
+(let ()
+  (define tile TILE-GARBAGE)
+  (define tilepict (tile-pict tile))
+  (add-sprite!/value db (tile->sym tile) tilepict))
+
+(define cdb (compile-sprite-db db))
+
+;;; it should only be initialized once
+(define ml-draw
+  (stage-draw/dc cdb W H LAYERS))
+
+
+;;; -----------------------------
+;;; Mode-lambda state variables
+
+
+;;; These lists will be mutated
+(define static (list ))
+(define dynamic (list ))
+
+;;; This vector can be mutated as well, but that's advanced
+(define ml-layers
+  (make-vector LAYERS (layer (* W 0.5) (* H 0.5))))
+
+
+(define gl-conf (new gl-config%))
+(send gl-conf set-hires-mode #t)
+(send gl-conf set-legacy? #f)
+
+(define (update-dynamic!)
+  (define plf (tetrion-playfield (tetris-tn tetris) #t))
+  (define sprites
+    (for/list ([blck (playfield-blocks plf)])
+     (define col (posn-x (block-posn blck)))
+     (define row (posn-y (block-posn blck)))
+     (define x col)
+     (define y (- ROWS-TOTAL row 1))
+     (define cx (fx->fl (+ (* BLOCK-W x) (/ BLOCK-W 2))))
+     (define cy (fx->fl (+ (* BLOCK-W y) (/ BLOCK-W 2))))
+     (define sprite-id (sprite-idx cdb (tile->sym (block-tile blck))))
+     (sprite cx cy sprite-id)))
+  (set! dynamic sprites))
+
+
+
 ;; ----------------------------
 ;; GUI
 
-;; Width and Height of canvases:
-
-;; Main tetris canvas:
-(define-values (tw th)
-  (~> tetris tetris-tn tetrion-playfield playfield-pict
-      ((λ (pic) (values (pict-width pic) (pict-height pic))))))
 
 ;; Queue canvas
 (define-values (qw qh)
@@ -204,8 +282,8 @@
          (define/augment (on-close)
            (exit)))
        [label FRAME-LABEL]
-       [width (+ tw qw hold-w)]
-       [height (max th qh hold-h)]))
+       [width (+ W qw hold-w)]
+       [height (max H qh hold-h)]))
 
 (define margin-container
   (new pane%
@@ -260,16 +338,18 @@
 (define tetris-canvas
   (new canvas%
        [parent main-vert-pane]
-       [style '(border)]
-       [min-width tw]
-       [min-height th]
+       [min-width W]
+       [min-height H]
        [stretchable-width #f]
        [stretchable-height #f]
+       [gl-config gl-conf]
+       [style '(border no-autoclear gl)]
        [paint-callback
-        (lambda (canvas dc)
-          (define plf (~> tetris tetris-tn (tetrion-playfield #t)))
-          (define pic (playfield-pict plf))
-          (draw-pict pic dc 0 0))]))
+        (λ (c dc)
+          (update-dynamic!)
+          (define draw (ml-draw ml-layers static dynamic))
+          (match/values (send c get-gl-client-size)
+            [(w h) (draw w h dc)]))]))
 
 (define timer-msg
   (new message%

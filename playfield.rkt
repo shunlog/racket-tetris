@@ -56,10 +56,10 @@
 
 ;; Example 1
 (define B1 (block (make-posn 0 0) TILE-GARBAGE))
-(define B2 (block (make-posn 1 1) TILE-GHOST))
+(define B2 (block (make-posn 1 1) TILE-GHOST-L))
 
 (define PLF1-blocks (list B1 B2))
-(define PLF1 (playfield 2 2 `((,TILE-GARBAGE #f) (#f ,TILE-GHOST))))
+(define PLF1 (playfield 2 2 `((,TILE-GARBAGE #f) (#f ,TILE-GHOST-L))))
 
 
 ; -------------------------------
