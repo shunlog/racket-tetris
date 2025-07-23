@@ -27,7 +27,7 @@
 (define FRAME-LABEL "World")
 
 (define ROWS 30)
-(define COLS 50)
+(define COLS 80)
 (define VANISH-LINES 2)
 (define ROWS-TOTAL (+ ROWS VANISH-LINES))
 
