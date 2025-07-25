@@ -23,15 +23,15 @@
 ;; -------------------------------
 ;; Constants
 
-(define FPS 60)
+(define FPS 120)
 (define FRAME-LABEL "World")
 
-(define ROWS 30)
-(define COLS 80)
+(define ROWS 20)
+(define COLS 10)
 (define VANISH-LINES 2)
 (define ROWS-TOTAL (+ ROWS VANISH-LINES))
 
-(define GARBAGE-ROWS 20)
+(define GARBAGE-ROWS 0)
 (define QUEUE-SIZE 5)
 (define LINES-CLEARED-GOAL 5)
 
@@ -44,9 +44,22 @@
 (define W (* BLOCK-W COLS))
 (define H (* BLOCK-W ROWS-TOTAL))
 
+
+;; -------------------------------
+;; State variables
+
+;; The Tetris state will be mutated for simplicity
+(define tetris null)
+(define running? #f)
+(define fps-last-ts 0)
+(define current-fps 0)
+
+;; The (millis) when the game started
+(define ms-start 0)
+
+
 ; -------------------------------
 ; Helpers
-
 
 ;; -> Natural
 ;; Returns the number of milliseconds since an unspecified starting time.
@@ -63,6 +76,10 @@
               #:tetrion (~> (new-tetrion #:rows ROWS #:cols COLS #:queue-size QUEUE-SIZE)
                             (tetrion-add-garbage GARBAGE-ROWS))))
 
+(define (update-fps!)
+  (define ms (millis))
+  (set! current-fps (/ 1000.0 (- ms fps-last-ts)))
+  (set! fps-last-ts ms))
 
 
 ;; Converts number to string, and pads it with 0's
@@ -78,18 +95,6 @@
   (define s (remainder (quotient total-ms 1000) 60))
   (define m (quotient total-ms (* 1000 60)))
   (format "~a:~a:~a" (num-pad-left m 2) (num-pad-left s 2) (num-pad-left ms 3)))
-
-
-;; -------------------------------
-;; State variables
-
-;; The Tetris state will be mutated for simplicity
-(define tetris (make-new-tetris))
-(define running? #f)
-
-
-;; The (millis) when the game started
-(define ms-start 0)
 
 
 ; -------------------------------
@@ -155,8 +160,7 @@
             ([exn:fail:tetris:gameover? (λ (msg) (game-over msg))])
             (define old-t tetris)
             (set! tetris (tetris-on-event tetris key-ev))
-            (unless (tetris-tetrions=? old-t tetris)
-              (update-canvases))
+            (update-canvases)
             (when (<= LINES-CLEARED-GOAL (tetrion-cleared (tetris-tn tetris)))
               (raise-tetris-gameover "Cleared all the lines")))])
   (send lines-cleared-count-msg set-label (number->string (tetrion-cleared (tetris-tn tetris)))))
@@ -168,8 +172,7 @@
   ;; (yield)
   (define old-t tetris)
   (set! tetris (tetris-on-tick tetris (millis)))
-  (unless (tetris-tetrions=? old-t tetris)
-    (update-canvases))
+  (update-canvases)
   (send timer-msg set-label (millis->string (- (millis) ms-start)))
 )
 
@@ -186,9 +189,14 @@
   ;; because the frame isn't drawn to the screen until the frame buffer was completed,
   ;; so there are less calls to Xorg.
   ;; For more info, see docs on gui/Windowing/1.7 Animation in Canvases
+  (update-fps!)
   (send tetris-canvas refresh-now)
   (send queue-canvas refresh-now)
-  (send hold-piece-canvas refresh-now))
+  (send hold-piece-canvas refresh-now)
+  (send frame set-label (format "FPS: ~v"
+                                (number->string
+                                 (/ (round (* 10 current-fps)) 10.0))))
+  )
 
 
 
@@ -263,7 +271,9 @@
 
 
 ;; ----------------------------
-;; GUI
+;; GUI + runtime
+
+(set! tetris (make-new-tetris))
 
 
 ;; Queue canvas
