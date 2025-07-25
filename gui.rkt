@@ -23,7 +23,7 @@
 ;; -------------------------------
 ;; Constants
 
-(define FPS 120)
+(define FPS 60)
 (define FRAME-LABEL "World")
 
 (define ROWS 20)
@@ -36,9 +36,6 @@
 (define LINES-CLEARED-GOAL 5)
 
 (define LAYERS 8)            ; mode-lambda layers, unsafe limit is 256
-
-
-(define TIMER-INTERVAL (inexact->exact (round (/ 1000 FPS))))
 
 ;;; Playfield canvas size
 (define W (* BLOCK-W COLS))
@@ -97,56 +94,32 @@
   (format "~a:~a:~a" (num-pad-left m 2) (num-pad-left s 2) (num-pad-left ms 3)))
 
 
-; -------------------------------
-; Implementation
-
-
-
 ;; Tetris Key-event -> Tetris
 ;; Get the new state of the global tetris on key event
-(define (tetris-on-event tetris key-ev)  
+(define (tetris-on-event t1 key-ev)
+  (define ms (millis))
   (case (send key-ev get-key-code)
-     [(left) (tetris-left-pressed tetris (millis))]
-     [(right) (tetris-right-pressed tetris (millis))]
-     [(up #\x) (tetris-rotate-cw tetris (millis))]
-     [(#\z) (tetris-rotate-ccw tetris (millis))]
-     [(#\a) (tetris-rotate-180 tetris (millis))]
-     [(#\space) (tetris-hard-drop tetris (millis))]
-     [(#\c) (tetris-hold tetris (millis))]
-     [(down) (tetris-soft-drop-pressed tetris (millis))]
-     [(#\s) (tetris-revert tetris)]
+     [(left) (tetris-left-pressed t1 ms)]
+     [(right) (tetris-right-pressed t1 ms)]
+     [(up #\x) (tetris-rotate-cw t1 ms)]
+     [(#\z) (tetris-rotate-ccw t1 ms)]
+     [(#\a) (tetris-rotate-180 t1 ms)]
+     [(#\space) (tetris-hard-drop t1 ms)]
+     [(#\c) (tetris-hold t1 ms)]
+     [(down) (tetris-soft-drop-pressed t1 ms)]
+     [(#\s) (tetris-revert t1)]
      [(release)
       (case (send key-ev get-key-release-code)
-        [(left) (tetris-left-released tetris (millis))]
-        [(right) (tetris-right-released tetris (millis))]
-        [(down) (tetris-soft-drop-released tetris (millis))]
-        [else tetris])]
-     [else tetris]))
+        [(left) (tetris-left-released t1 ms)]
+        [(right) (tetris-right-released t1 ms)]
+        [(down) (tetris-soft-drop-released t1 ms)]
+        [else t1])]
+     [else t1]))
 
 
-;; Override the frame%'s event handler,
-;; which by default consumes some char events, including the arrow keys.
-;; Make the frame ignore auto-key / autofire
-(define tetris-frame%
-  (class frame%
-    (init) (super-new)
 
-    (define keys-state-hash (make-hash))
-
-    (define/override (on-subwindow-char receiver event)
-      (define release-kc (send event get-key-code))
-      (define pressed? (not (equal? 'release release-kc)))
-      (define key-code
-        (if pressed? release-kc (send event get-key-release-code)))
-      (define was-pressed? (hash-ref keys-state-hash key-code #f))
-
-      (unless ;; filter autofire
-          (and was-pressed? pressed?)
-        (tetris-frame-on-event event))
-      
-      (hash-set! keys-state-hash key-code pressed?)
-      #f  ;; return #f to pass the event further
-      )))
+;;; ----------------------------
+;;; Event handlers (input, update, draw)
 
 
 ;; Key-event -> void
@@ -158,7 +131,14 @@
     [(not running?) (void)]
     [else (with-handlers
             ([exn:fail:tetris:gameover? (λ (msg) (game-over msg))])
-            (define old-t tetris)
+            ;; run the on-tick-update before handling the user input.
+            ;; this is the idealized scenario,
+            ;; it is equivalent to running on-tick infinitely fast, repeatedly.
+            ;; the only downside is that the player doesn't see the updates just as fast,
+            ;; but we can compensate by delaying the on-tick ms a bit (e.g. 16ms).
+            ;; However this is better because we make the compensation explicit
+            ;; rather than relying on the clock speed
+            (update)
             (set! tetris (tetris-on-event tetris key-ev))
             (draw)
             (when (<= LINES-CLEARED-GOAL (tetrion-cleared (tetris-tn tetris)))
@@ -269,9 +249,35 @@
 
 
 ;; ----------------------------
-;; GUI + runtime
+;; GUI
 
+;;; needed to get dimensions
 (set! tetris (make-new-tetris))
+
+
+;; Override the frame%'s event handler,
+;; which by default consumes some char events, including the arrow keys.
+;; Make the frame ignore auto-key / autofire
+(define tetris-frame%
+  (class frame%
+    (init) (super-new)
+
+    (define keys-state-hash (make-hash))
+
+    (define/override (on-subwindow-char receiver event)
+      (define release-kc (send event get-key-code))
+      (define pressed? (not (equal? 'release release-kc)))
+      (define key-code
+        (if pressed? release-kc (send event get-key-release-code)))
+      (define was-pressed? (hash-ref keys-state-hash key-code #f))
+
+      (unless ;; filter autofire
+          (and was-pressed? pressed?)
+        (tetris-frame-on-event event))
+      
+      (hash-set! keys-state-hash key-code pressed?)
+      #f  ;; return #f to pass the event further
+      )))
 
 
 ;; Queue canvas
@@ -389,8 +395,27 @@
 (send game-over-msg show #f)
 
 
+
+;;; ---------------------------------
+;; Game loop
+
+;;; More on game loops: https://gameprogrammingpatterns.com/game-loop.html
+
+(define (game-loop)
+  (let loop ()
+    (define ms-start (millis))
+    (when running?
+      (update)
+      (draw))
+    (define ms-passed (- (millis) ms-start))
+    (define ms-leftover (- (/ 1000.0 FPS) ms-passed))
+    ;; Let GUI process any pending events even when late
+    (define ms-sleep (max 1.0 ms-leftover))
+    (sleep/yield (/ ms-sleep 1000.0))
+    (loop)))
+
+
 (define (game-over msg)
-  (send timer stop)
   (set! running? #f)
   (send game-over-msg show #t)
   (println msg)
@@ -403,20 +428,9 @@
   (set! ms-start (millis))
   (send game-over-msg show #f)
   (draw)
-  (send timer start TIMER-INTERVAL))
+  )
 
 
 (send frame show #t)
-
-
-;;; ---------------------------------
-;; Game loop
-
-
-(define timer
-  (new timer%
-       [notify-callback (λ () (begin (update)
-                                     (draw)))]
-       ;; don't start yet
-       [interval #f]))
 (restart-game)
+(game-loop)
