@@ -160,7 +160,7 @@
             ([exn:fail:tetris:gameover? (λ (msg) (game-over msg))])
             (define old-t tetris)
             (set! tetris (tetris-on-event tetris key-ev))
-            (update-canvases)
+            (draw)
             (when (<= LINES-CLEARED-GOAL (tetrion-cleared (tetris-tn tetris)))
               (raise-tetris-gameover "Cleared all the lines")))])
   (send lines-cleared-count-msg set-label (number->string (tetrion-cleared (tetris-tn tetris)))))
@@ -168,16 +168,13 @@
 
 ;; void -> void
 ;; Update the tetris on a clock tick (called by timer)
-(define (on-tick)
-  ;; (yield)
+(define (update)
   (define old-t tetris)
   (set! tetris (tetris-on-tick tetris (millis)))
-  (update-canvases)
-  (send timer-msg set-label (millis->string (- (millis) ms-start)))
 )
 
 
-(define (update-canvases)
+(define (draw)
   ;; refresh-now is different from refresh in that it controls the flushing to the screen,
   ;; rather than letting the system decide when to flush.
   ;; It basically does this:
@@ -196,6 +193,7 @@
   (send frame set-label (format "FPS: ~v"
                                 (number->string
                                  (/ (round (* 10 current-fps)) 10.0))))
+  (send timer-msg set-label (millis->string (- (millis) ms-start)))
   )
 
 
@@ -391,30 +389,34 @@
 (send game-over-msg show #f)
 
 
-;; Make sure the timer doesn't start automatically
-(define timer
-  (new timer%
-       [notify-callback on-tick]))
-
-
 (define (game-over msg)
   (send timer stop)
   (set! running? #f)
   (send game-over-msg show #t)
   (println msg)
-  (update-canvases))
+  (draw))
 
 
 (define (restart-game)
   (set! tetris (make-new-tetris))
-  (send timer start TIMER-INTERVAL)
   (set! running? #t)
   (set! ms-start (millis))
   (send game-over-msg show #f)
-  (update-canvases))
+  (draw)
+  (send timer start TIMER-INTERVAL))
 
 
 (send frame show #t)
 
-;; Start the game at this point
+
+;;; ---------------------------------
+;; Game loop
+
+
+(define timer
+  (new timer%
+       [notify-callback (λ () (begin (update)
+                                     (draw)))]
+       ;; don't start yet
+       [interval #f]))
 (restart-game)
