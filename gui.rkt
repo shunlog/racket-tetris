@@ -123,35 +123,32 @@
 
 
 ;; Key-event -> void
-;; Update the tetris on key press/release
-(define (tetris-frame-on-event key-ev)
+;; Handle a key event on the main window frame
+(define (on-event key-ev)
   (cond
     [(eq? 'f4 (send key-ev get-key-code))
      (restart-game)]
     [(not running?) (void)]
-    [else (with-handlers
-            ([exn:fail:tetris:gameover? (λ (msg) (game-over msg))])
-            ;; run the on-tick-update before handling the user input.
-            ;; this is the idealized scenario,
-            ;; it is equivalent to running on-tick infinitely fast, repeatedly.
-            ;; the only downside is that the player doesn't see the updates just as fast,
-            ;; but we can compensate by delaying the on-tick ms a bit (e.g. 16ms).
-            ;; However this is better because we make the compensation explicit
-            ;; rather than relying on the clock speed
-            (update)
-            (set! tetris (tetris-on-event tetris key-ev))
-            (draw)
-            (when (<= LINES-CLEARED-GOAL (tetrion-cleared (tetris-tn tetris)))
-              (raise-tetris-gameover "Cleared all the lines")))])
+    [else
+     ;; run the on-tick-update before handling the user input.
+     ;; this is the idealized scenario,
+     ;; it is equivalent to running on-tick infinitely fast, repeatedly.
+     ;; the only downside is that the player doesn't see the updates just as fast,
+     ;; but we can compensate by delaying the on-tick ms a bit (e.g. 16ms).
+     ;; However this is better because we make the compensation explicit
+     ;; rather than relying on the clock speed
+     (on-update)
+     (set! tetris (tetris-on-event tetris key-ev))
+     (draw)
+     (when (<= LINES-CLEARED-GOAL (tetrion-cleared (tetris-tn tetris)))
+       (raise-tetris-gameover "Cleared all the lines"))])
   (send lines-cleared-count-msg set-label (number->string (tetrion-cleared (tetris-tn tetris)))))
 
 
 ;; void -> void
-;; Update the tetris on a clock tick (called by timer)
-(define (update)
-  (define old-t tetris)
-  (set! tetris (tetris-on-tick tetris (millis)))
-)
+;; Update the tetris on a clock tick (called at least 60 times/minute)
+(define (on-update)
+  (set! tetris (tetris-on-tick tetris (millis))))
 
 
 (define (draw)
@@ -273,7 +270,11 @@
 
       (unless ;; filter autofire
           (and was-pressed? pressed?)
-        (tetris-frame-on-event event))
+        (with-handlers
+          ([exn:fail:tetris:gameover?
+            (λ (msg) (game-over msg))])
+          (on-event event))
+        )
       
       (hash-set! keys-state-hash key-code pressed?)
       #f  ;; return #f to pass the event further
@@ -405,7 +406,9 @@
   (let loop ()
     (define ms-start (millis))
     (when running?
-      (update)
+      (with-handlers
+        ([exn:fail:tetris:gameover? (λ (msg) (game-over msg))])
+        (on-update))      
       (draw))
     (define ms-passed (- (millis) ms-start))
     (define ms-leftover (- (/ 1000.0 FPS) ms-passed))
