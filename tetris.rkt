@@ -342,7 +342,7 @@
       (tetris--move t-acc ms dirn)))
   ;; Time when a dirn key was last pressed/released
   (define t-dirn (max (tetris--pressed-t t 'right) (tetris--pressed-t t 'left)))
-
+ 
   ;; Assuming the delay has passed,
   ;; autoshift in the given dirn if enough time has passed since the previous autoshift
   (define (autoshift-in-dirn dirn)
@@ -398,7 +398,11 @@
 
 
 ;; Tetris Natural -> Tetris
-;; Do everything that needs to happen on a tick
+;; Do everything that needs to happen on a tick.
+;;; The result can differ depending on how often this function is called
+;;; For example if it's called too late,
+;;; it might do 3xdown+3xright instead of 3x(down+right)
+;;; TODO: make the result determined only by the timestamps of inputs?
 (define (tetris-on-tick t ms)
   (~> t
       (tetris-fps-tick ms)
