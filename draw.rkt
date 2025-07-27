@@ -252,18 +252,25 @@
 ;;; Get tile bitmaps from file
 ;;;
 
+;;; assuming 12 square tiles spread horizontally
+;;; with optional gaps in between tiles
+(define SKIN-FILE "skins/NES.png")
+(define TILEMAP-SIZE 12)
+
 (define skin-bmp
-  (make-object bitmap% "jstris_skin.png" 'unknown #f #t))
+  (make-object bitmap% SKIN-FILE 'unknown/alpha #f #t))
 (define skin-pict (bitmap skin-bmp))
 
-(define gap 1)
 (define width (pict-width skin-pict))
-(define height (pict-height skin-pict)) ;assuming no gaps on top/bottom
+(define height (pict-height skin-pict))
+; gap is different for each skin
+(define gap (/ (- width (* height TILEMAP-SIZE))
+               (- TILEMAP-SIZE 1)))
+
 
 ;;; Split tilemap into tile picts
 (define tiles-pl
-  (for/list
-    [(i (modulo width height))]
+  (for/list [(i TILEMAP-SIZE)]
    (define left-inset (* (+ height gap) i))
    (define right-inset (- width left-inset height))
    (inset/clip skin-pict
@@ -281,7 +288,7 @@
             [(I) (list-ref tiles-pl 4)]
             [(J) (list-ref tiles-pl 5)]
             [(T) (list-ref tiles-pl 6)]
-            [else (list-ref tiles-pl 10)])]))
+            [else (list-ref tiles-pl 11)])]))
 
 
 (module+ test
