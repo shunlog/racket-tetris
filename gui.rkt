@@ -33,7 +33,7 @@
 
 (define GARBAGE-ROWS 0)
 (define QUEUE-SIZE 5)
-(define LINES-CLEARED-GOAL 5)
+(define LINES-CLEARED-GOAL 40)
 
 (define LAYERS 8)            ; mode-lambda layers, unsafe limit is 256
 
@@ -130,14 +130,6 @@
      (restart-game)]
     [(not running?) (void)]
     [else
-     ;; run the on-tick-update before handling the user input.
-     ;; this is the idealized scenario,
-     ;; it is equivalent to running on-tick infinitely fast, repeatedly.
-     ;; the only downside is that the player doesn't see the updates just as fast,
-     ;; but we can compensate by delaying the on-tick ms a bit (e.g. 16ms).
-     ;; However this is better because we make the compensation explicit
-     ;; rather than relying on the clock speed
-     (on-update)
      (set! tetris (tetris-on-event tetris key-ev))
      (draw)
      (when (<= LINES-CLEARED-GOAL (tetrion-cleared (tetris-tn tetris)))
