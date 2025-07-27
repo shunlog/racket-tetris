@@ -72,7 +72,7 @@
            [else (raise "Error")])]))
 
 
-(define (tile-pict tile)
+(define (tile-pict-v0 tile)
   (define color (block-color tile))
   (define hw (/ BLOCK-W 2))             ; half width of square
   (define bw 2)                         ; border width inside square
@@ -118,7 +118,7 @@
 (define/memoize (tile-bitmap tile ) #:hash hash
   (bitmap (if (not tile)
               (blank BLOCK-W BLOCK-W)
-              (tile-pict tile))))
+              (tile-pict-v0 tile))))
 
 (define (playfield-pict plf)
   (define rows (playfield-rows plf))
@@ -246,3 +246,54 @@
     (displayln "Drawing the piece preview")
     (define sn-ls0 '(I J))
     (queue-pict sn-ls0)))
+
+
+;;; 
+;;; Get tile bitmaps from file
+;;;
+
+(define skin-bmp
+  (make-object bitmap% "jstris_skin.png" 'unknown #f #t))
+(define skin-pict (bitmap skin-bmp))
+
+(define gap 1)
+(define width (pict-width skin-pict))
+(define height (pict-height skin-pict)) ;assuming no gaps on top/bottom
+
+;;; Split tilemap into tile picts
+(define tiles-pl
+  (for/list
+    [(i (modulo width height))]
+   (define left-inset (* (+ height gap) i))
+   (define right-inset (- width left-inset height))
+   (inset/clip skin-pict
+               (- left-inset) 0 (- right-inset) 0)))
+
+(define (tile-pict-v1 tile)
+  (cond
+    [(tile-ghost? tile) (list-ref tiles-pl 7)]
+    [(tile-garbage? tile) (list-ref tiles-pl 8)]
+    [else (case (tile-shape tile)
+            [(Z) (list-ref tiles-pl 0)]
+            [(L) (list-ref tiles-pl 1)]
+            [(O) (list-ref tiles-pl 2)]
+            [(S) (list-ref tiles-pl 3)]
+            [(I) (list-ref tiles-pl 4)]
+            [(J) (list-ref tiles-pl 5)]
+            [(T) (list-ref tiles-pl 6)]
+            [else (list-ref tiles-pl 10)])]))
+
+
+(module+ test
+  (test-case
+      "The tiles skin read from the file"
+    (displayln "The tiles skin read from the file")
+    tiles-pl))
+
+
+;;; 
+;;; Combine multiple versions
+
+;;; Tile -> Pict
+(define (tile-pict tile)
+  (tile-pict-v1 tile))

@@ -21,7 +21,7 @@
 
 @examples[
      #:eval ss-eval
-     (tile-pict TILE-GARBAGE)
-      (tile-pict (tile-normal 'L))
-            (tile-pict (tile-ghost 'L))
+     (tile-pict-v0 TILE-GARBAGE)
+      (tile-pict-v0 (tile-normal 'L))
+            (tile-pict-v0 (tile-ghost 'L))
    ]

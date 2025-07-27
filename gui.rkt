@@ -192,6 +192,8 @@
      (string->symbol (string-append "normal-" (symbol->string (tile-shape tile))))]))
 
 ;;; Generate picts for each possible tile
+(define GARBAGE-TILE-PICT (tile-pict TILE-GARBAGE))
+(define ACTUAL-BLOCK-W (pict-width GARBAGE-TILE-PICT))
 (for ([sn SHAPE-NAMES])
   (define tile (tile-normal sn))
   (define tilepict (tile-pict tile))
@@ -231,16 +233,18 @@
 
 (define (update-dynamic!)
   (define plf (tetrion-playfield (tetris-tn tetris) #t))
+  (define TILE-SCALE (/ (fx->fl BLOCK-W) ACTUAL-BLOCK-W))
+  (define BLOCK-W/2 (/ BLOCK-W 2))
   (define sprites
     (for/list ([blck (playfield-blocks plf)])
      (define col (posn-x (block-posn blck)))
      (define row (posn-y (block-posn blck)))
      (define x col)
      (define y (- ROWS-TOTAL row 1))
-     (define cx (fx->fl (+ (* BLOCK-W x) (/ BLOCK-W 2))))
-     (define cy (fx->fl (+ (* BLOCK-W y) (/ BLOCK-W 2))))
+     (define cx (fx->fl (+ (* BLOCK-W x) BLOCK-W/2)))
+     (define cy (fx->fl (+ (* BLOCK-W y) BLOCK-W/2)))
      (define sprite-id (sprite-idx cdb (tile->sym (block-tile blck))))
-     (sprite cx cy sprite-id)))
+     (sprite cx cy sprite-id #:m TILE-SCALE)))
   (set! dynamic sprites))
 
 
