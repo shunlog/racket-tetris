@@ -41,7 +41,7 @@
         'I (make-color 0 247 255)
         'O (make-color 242 235 12)))
 
-(define BLOCK-W 22)
+(define BLOCK-W 20)
 
 (define GHOST-ALPHA 0.3)
 (define VANISH-LINES 2)    ; number of rows to draw in the vanish zone
@@ -260,6 +260,9 @@
 (define skin-bmp
   (make-object bitmap% SKIN-FILE 'unknown/alpha #f #t))
 (define skin-pict (bitmap skin-bmp))
+;;; Some skins have a gap at the end for some reason
+(when (= 372 (pict-width skin-pict))
+  (set! skin-pict (inset/clip skin-pict 0 0 -1 0)))
 
 (define width (pict-width skin-pict))
 (define height (pict-height skin-pict))
@@ -288,7 +291,7 @@
             [(I) (list-ref tiles-pl 4)]
             [(J) (list-ref tiles-pl 5)]
             [(T) (list-ref tiles-pl 6)]
-            [else (list-ref tiles-pl 11)])]))
+            [else (list-ref tiles-pl 0)])]))
 
 
 (module+ test

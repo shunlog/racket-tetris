@@ -221,6 +221,7 @@
 
 (define gl-conf (new gl-config%))
 (send gl-conf set-hires-mode #t)
+(gl-smoothing? #f)
 (send gl-conf set-legacy? #f)
 
 (define (update-dynamic!)
