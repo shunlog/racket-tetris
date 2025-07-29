@@ -133,8 +133,7 @@
      (set! tetris (tetris-on-event tetris key-ev))
      (draw)
      (when (<= LINES-CLEARED-GOAL (tetrion-cleared (tetris-tn tetris)))
-       (raise-tetris-gameover "Cleared all the lines"))])
-  (send lines-cleared-count-msg set-label (number->string (tetrion-cleared (tetris-tn tetris)))))
+       (raise-tetris-gameover "Cleared all the lines"))]))
 
 
 ;; void -> void
@@ -163,7 +162,7 @@
                                 (number->string
                                  (/ (round (* 10 current-fps)) 10.0))))
   (send timer-msg set-label (millis->string (- (millis) ms-start)))
-  )
+  (send lines-cleared-count-msg set-label (number->string (tetrion-cleared (tetris-tn tetris)))))
 
 
 
@@ -383,7 +382,7 @@
        [parent lines-cleared-pane]))
 (define lines-cleared-count-msg
   (new message%
-       [label "0"]
+       [label " 0 "]                    ; give it some space in advance
        [parent lines-cleared-pane]))
 
 (define game-over-msg
